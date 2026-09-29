@@ -17,15 +17,13 @@ LLM acting as Game Master can consume.
 
 IDs:
     - Database/model objects use positive integers.
-    - Runtime instances use 8-character hexadecimal IDs, as recommended by
-      the specification's final section.
+    - Runtime instances use 8-character hexadecimal IDs
 
 Coordinates:
     - (0, 0) is the top-left cell.
     - X = column, Y = row.
     - Matrices are indexed as matrix[Y][X].
 
-This module has no Pygame dependency, so it can also be used headlessly.
 """
 
 from __future__ import annotations
@@ -272,7 +270,7 @@ class ConditionInstance:
 class Engine:
     """Main RPG simulation engine.
 
-    The class exposes the public API described by the specification while
+    The class exposes the public API while
     keeping internal state in separate model/instance stores.
 
     A typical LLM integration can call:
@@ -399,6 +397,15 @@ class Engine:
     # -----------------------------------------------------------------------
 
     def create_map(self, width: int, height: int, config: list[list[str]]) -> int:
+        """ Creates a map with the specified parameters and saves it in the
+        map database.
+
+        :param width: The width of the map.
+        :param height: The height of the map.
+        :param config: The configuration of the map (what each cell contains).
+
+        :return: The map id.
+        """
         width = self._require_int(width, "W")
         height = self._require_int(height, "H")
         if width <= 0 or height <= 0:
