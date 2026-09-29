@@ -46,10 +46,6 @@ responsible for all state changes and rule validation.
 
 from __future__ import annotations
 
-import json
-import sys
-from pathlib import Path
-
 import pygame
 
 from engine import EngineError, create_demo_engine
