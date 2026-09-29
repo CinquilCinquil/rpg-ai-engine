@@ -367,6 +367,7 @@ class RPGEditor:
             "F            Apply fire",
             "R            Remove conditions",
             "C            Toggle debug",
+            "X            Clear selections"
         ]
         for line in controls:
             surface = self.small_font.render(line, True, MUTED)
@@ -440,6 +441,10 @@ class RPGEditor:
 
         elif key == pygame.K_c:
             self.show_debug = not self.show_debug
+
+        elif key == pygame.K_x:
+            self.selected_entity = None
+            self.selected_cell = None
 
         elif key == pygame.K_1:
             self.terrain_brush = "EARTH"
