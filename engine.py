@@ -47,18 +47,18 @@ from typing import Any, Callable, Optional
 TERRAINS = {"EARTH", "SAND", "WATER"}
 STRUCTURES = {"NONE", "HOUSE", "STORE", "STATUE"}
 ENTITY_TYPES = {"PLAYER", "NPC", "STATIC"}
-ATTRIBUTES = {"FOR", "AGI", "INT", "PRE", "CONS"}
+ATTRIBUTES = {"STR", "DEX", "INT", "CHA", "CON"}
 STATUSES = {"HP", "HPMAX", "AC", "XP"}
 
 FUNCTIONALITIES = {
     "PASSIVE",
-    "EFEITO_EM_ALVO",
-    "EFEITO_EM_POSICAO",
-    "USO_SIMPLES",
-    "NARRATIVO",
+    "TARGET_EFFECT",
+    "POSITION_EFFECT",
+    "SIMPLE_USE",
+    "NARRATIVE",
 }
 
-CONDITION_DURATION_UNITS = {"ACOES", "TURNOS", "RODADAS", "INDEFINIDO"}
+CONDITION_DURATION_UNITS = {"ACTIONS", "TURNS", "ROUNDS", "INDEFINITE"}
 
 
 # ---------------------------------------------------------------------------
@@ -80,22 +80,22 @@ class EngineError(Exception):
 
     def to_dict(self) -> dict:
         result = {
-            "Sucesso": False,
-            "Erro": {
-                "Codigo": self.code,
-                "Mensagem": self.message,
+            "Success": False,
+            "Error": {
+                "Code": self.code,
+                "Message": self.message,
             },
         }
         if self.details:
-            result["Erro"]["Detalhes"] = copy.deepcopy(self.details)
+            result["Error"]["Details"] = copy.deepcopy(self.details)
         return result
 
 
 def success(value: Any = None) -> dict:
     """Create a standardized successful command response."""
-    result = {"Sucesso": True}
+    result = {"Success": True}
     if value is not None:
-        result["Resultado"] = value
+        result["Result"] = value
     return result
 
 
@@ -146,12 +146,12 @@ class SafeExpressionEvaluator:
             sides = int(match.group(2))
             if count <= 0 or sides <= 0:
                 raise EngineError(
-                    "VALOR_INVALIDO",
+                    "INVALID_VALUE",
                     "Dice expressions require positive count and sides.",
                 )
             if count > 10000:
                 raise EngineError(
-                    "VALOR_INVALIDO",
+                    "INVALID_VALUE",
                     "A dice expression may contain at most 10000 dice.",
                 )
             total = sum(self.dice_roller(sides) for _ in range(count))
@@ -162,7 +162,7 @@ class SafeExpressionEvaluator:
     def evaluate(self, expression: str) -> int | float:
         if not isinstance(expression, str) or not expression.strip():
             raise EngineError(
-                "ARGUMENTO_INVALIDO",
+                "INVALID_ARGUMENT",
                 "Expression must be a non-empty string.",
             )
 
@@ -172,7 +172,7 @@ class SafeExpressionEvaluator:
             tree = ast.parse(expression, mode="eval")
         except SyntaxError as exc:
             raise EngineError(
-                "ARGUMENTO_INVALIDO",
+                "INVALID_ARGUMENT",
                 f"Invalid expression: {expression}",
             ) from exc
 
@@ -185,7 +185,7 @@ class SafeExpressionEvaluator:
     def _eval_node(self, node: ast.AST) -> int | float:
         if isinstance(node, ast.Constant):
             if isinstance(node.value, bool) or not isinstance(node.value, (int, float)):
-                raise EngineError("ARGUMENTO_INVALIDO", "Only numeric constants are allowed.")
+                raise EngineError("INVALID_ARGUMENT", "Only numeric constants are allowed.")
             return node.value
 
         if isinstance(node, ast.BinOp) and type(node.op) in self.BINARY_OPS:
@@ -194,18 +194,18 @@ class SafeExpressionEvaluator:
 
             if isinstance(node.op, (ast.Pow,)):
                 if abs(right) > 100:
-                    raise EngineError("VALOR_INVALIDO", "Exponent is too large.")
+                    raise EngineError("INVALID_VALUE", "Exponent is too large.")
 
             try:
                 return self.BINARY_OPS[type(node.op)](left, right)
             except ZeroDivisionError as exc:
-                raise EngineError("VALOR_INVALIDO", "Division by zero.") from exc
+                raise EngineError("INVALID_VALUE", "Division by zero.") from exc
 
         if isinstance(node, ast.UnaryOp) and type(node.op) in self.UNARY_OPS:
             return self.UNARY_OPS[type(node.op)](self._eval_node(node.operand))
 
         raise EngineError(
-            "ARGUMENTO_INVALIDO",
+            "INVALID_ARGUMENT",
             "Expression contains an unsupported operation.",
         )
 
@@ -288,7 +288,7 @@ class Engine:
 
     def __init__(self, seed: Optional[int] = None):
         self.random = random.Random(seed)
-        self._expression_evaluator = SafeExpressionEvaluator(self.rolar_dado)
+        self._expression_evaluator = SafeExpressionEvaluator(self.roll_dice)
 
         self.maps: dict[int, MapState] = {}
         self.entity_models: dict[int, EntityModel] = {}
@@ -312,61 +312,61 @@ class Engine:
     @staticmethod
     def _require_int(value: Any, name: str) -> int:
         if isinstance(value, bool) or not isinstance(value, int):
-            raise EngineError("ARGUMENTO_INVALIDO", f"{name} must be an integer.")
+            raise EngineError("INVALID_ARGUMENT", f"{name} must be an integer.")
         return value
 
     @staticmethod
     def _validate_matrix(matrix: Any, width: int, height: int, valid_values: set[str], name: str):
         if not isinstance(matrix, list) or len(matrix) != height:
             raise EngineError(
-                "VALOR_INVALIDO",
+                "INVALID_VALUE",
                 f"{name} must contain exactly {height} rows.",
             )
         for y, row in enumerate(matrix):
             if not isinstance(row, list) or len(row) != width:
                 raise EngineError(
-                    "VALOR_INVALIDO",
+                    "INVALID_VALUE",
                     f"{name}[{y}] must contain exactly {width} columns.",
                 )
             for x, value in enumerate(row):
                 if value not in valid_values:
                     raise EngineError(
-                        "VALOR_INVALIDO",
+                        "INVALID_VALUE",
                         f"Invalid {name} value at ({x}, {y}): {value}.",
                     )
 
     def _require_current_map(self) -> MapState:
         if self.current_map_id is None or self.current_map_id not in self.maps:
-            raise EngineError("MAPA_INEXISTENTE", "No map is currently selected.")
+            raise EngineError("MAP_NOT_FOUND", "No map is currently selected.")
         return self.maps[self.current_map_id]
 
     def _require_map(self, map_id: int) -> MapState:
         if map_id not in self.maps:
-            raise EngineError("MAPA_INEXISTENTE", f"Map {map_id} does not exist.")
+            raise EngineError("MAP_NOT_FOUND", f"Map {map_id} does not exist.")
         return self.maps[map_id]
 
     def _require_model(self, entity_id: int) -> EntityModel:
         if entity_id not in self.entity_models:
-            raise EngineError("ENTIDADE_INEXISTENTE", f"Entity model {entity_id} does not exist.")
+            raise EngineError("ENTITY_NOT_FOUND", f"Entity model {entity_id} does not exist.")
         return self.entity_models[entity_id]
 
     def _require_instance(self, instance_id: str) -> EntityInstance:
         if instance_id not in self._instances:
-            raise EngineError("ID_INEXISTENTE", f"Entity instance {instance_id} does not exist.")
+            raise EngineError("ID_NOT_FOUND", f"Entity instance {instance_id} does not exist.")
         return self._instances[instance_id]
 
     def _require_item_model(self, item_id: int) -> ItemModel:
         if item_id not in self.item_models:
-            raise EngineError("ID_INEXISTENTE", f"Item model {item_id} does not exist.")
+            raise EngineError("ID_NOT_FOUND", f"Item model {item_id} does not exist.")
         return self.item_models[item_id]
 
     def _require_position(self, x: int, y: int, map_state: Optional[MapState] = None):
         map_state = map_state or self._require_current_map()
         if not isinstance(x, int) or not isinstance(y, int):
-            raise EngineError("POSICAO_INVALIDA", "X and Y must be integers.")
+            raise EngineError("INVALID_POSITION", "X and Y must be integers.")
         if not (0 <= x < map_state.width and 0 <= y < map_state.height):
             raise EngineError(
-                "POSICAO_INVALIDA",
+                "INVALID_POSITION",
                 f"Position ({x}, {y}) is outside map {map_state.map_id}.",
             )
 
@@ -374,14 +374,14 @@ class Engine:
     # Dice and expressions
     # -----------------------------------------------------------------------
 
-    def rolar_dado(self, n: int) -> int:
+    def roll_dice(self, n: int) -> int:
         """Roll an N-sided die, uniformly from 1 through N."""
         n = self._require_int(n, "N")
         if n <= 0:
-            raise EngineError("VALOR_INVALIDO", "N must be greater than zero.")
+            raise EngineError("INVALID_VALUE", "N must be greater than zero.")
         return self.random.randint(1, n)
 
-    def calcular_expressao(self, expression: str) -> int | float:
+    def evaluate_expression(self, expression: str) -> int | float:
         """Evaluate arithmetic and XdY dice expressions."""
         return self._expression_evaluator.evaluate(expression)
 
@@ -389,7 +389,7 @@ class Engine:
     # Geometry
     # -----------------------------------------------------------------------
 
-    def calcular_distancia(self, x: int, y: int, w: int, z: int) -> int:
+    def calculate_distance(self, x: int, y: int, w: int, z: int) -> int:
         for value, name in ((x, "X"), (y, "Y"), (w, "W"), (z, "Z")):
             self._require_int(value, name)
         return abs(x - w) + abs(y - z)
@@ -398,11 +398,11 @@ class Engine:
     # Maps
     # -----------------------------------------------------------------------
 
-    def criar_mapa(self, width: int, height: int, config: list[list[str]]) -> int:
+    def create_map(self, width: int, height: int, config: list[list[str]]) -> int:
         width = self._require_int(width, "W")
         height = self._require_int(height, "H")
         if width <= 0 or height <= 0:
-            raise EngineError("VALOR_INVALIDO", "Map dimensions must be positive.")
+            raise EngineError("INVALID_VALUE", "Map dimensions must be positive.")
 
         self._validate_matrix(config, width, height, TERRAINS, "Terrain")
 
@@ -425,11 +425,11 @@ class Engine:
 
         return map_id
 
-    def popular_mapa(self, width: int, height: int, config: list[list[str]]) -> dict:
+    def populate_map(self, width: int, height: int, config: list[list[str]]) -> dict:
         current = self._require_current_map()
         if width != current.width or height != current.height:
             raise EngineError(
-                "VALOR_INVALIDO",
+                "INVALID_VALUE",
                 "Structure dimensions must match the current map dimensions.",
             )
 
@@ -437,21 +437,21 @@ class Engine:
         current.structures = deep_copy(config)
         return success()
 
-    def listar_mapas(self) -> list[int]:
+    def list_maps(self) -> list[int]:
         return list(self.maps.keys())
 
-    def consultar_mapa_atual(self) -> dict:
+    def get_current_map(self) -> dict:
         current = self._require_current_map()
         return {
-            "MapaID": current.map_id,
-            "Largura": current.width,
-            "Altura": current.height,
-            "Terreno": deep_copy(current.terrain),
-            "Estruturas": deep_copy(current.structures),
-            "Entidades": [
+            "MapID": current.map_id,
+            "Width": current.width,
+            "Height": current.height,
+            "Terrain": deep_copy(current.terrain),
+            "Structures": deep_copy(current.structures),
+            "Entities": [
                 {
-                    "InstanciaID": instance.instance_id,
-                    "EntidadeID": instance.model_id,
+                    "InstanceID": instance.instance_id,
+                    "EntityID": instance.model_id,
                     "X": instance.x,
                     "Y": instance.y,
                 }
@@ -459,10 +459,10 @@ class Engine:
             ],
         }
 
-    def consultar_mapa_atual_id(self) -> int:
+    def get_current_map_id(self) -> int:
         return self._require_current_map().map_id
 
-    def definir_mapa_atual(self, map_id: int) -> dict:
+    def set_current_map(self, map_id: int) -> dict:
         self._require_map(map_id)
         self.current_map_id = map_id
         return success(map_id)
@@ -471,19 +471,19 @@ class Engine:
     # Entity database
     # -----------------------------------------------------------------------
 
-    def criar_entidade(self, config: dict) -> int:
+    def create_entity(self, config: dict) -> int:
         if not isinstance(config, dict):
-            raise EngineError("ARGUMENTO_INVALIDO", "Entity CONFIG must be an object.")
+            raise EngineError("INVALID_ARGUMENT", "Entity CONFIG must be an object.")
 
-        entity_type = config.get("Tipo")
+        entity_type = config.get("Type")
         if entity_type not in ENTITY_TYPES:
             raise EngineError(
-                "VALOR_INVALIDO",
-                f"Tipo must be one of {sorted(ENTITY_TYPES)}.",
+                "INVALID_VALUE",
+                f"Type must be one of {sorted(ENTITY_TYPES)}.",
             )
 
-        if not config.get("Nome"):
-            raise EngineError("VALOR_INVALIDO", "Entity must have a Nome.")
+        if not config.get("Name"):
+            raise EngineError("INVALID_VALUE", "Entity must have a Name.")
 
         data = deep_copy(config)
 
@@ -492,12 +492,12 @@ class Engine:
             data.setdefault("HP", data["HPMax"])
             data.setdefault("AC", 10)
             data.setdefault("XP", 0)
-            data.setdefault("Atributos", {})
-            data["Atributos"] = {
-                attribute: int(data["Atributos"].get(attribute, 0))
+            data.setdefault("Attributes", {})
+            data["Attributes"] = {
+                attribute: int(data["Attributes"].get(attribute, 0))
                 for attribute in ATTRIBUTES
             }
-            data.setdefault("Proficiencias", {})
+            data.setdefault("Proficiencies", {})
 
         entity_id = self._next_entity_id
         self._next_entity_id += 1
@@ -508,14 +508,14 @@ class Engine:
     # Entity instances
     # -----------------------------------------------------------------------
 
-    def criar_entidade_no_mapa(self, entity_id: int, x: int, y: int) -> str:
+    def spawn_entity(self, entity_id: int, x: int, y: int) -> str:
         model = self._require_model(entity_id)
         current = self._require_current_map()
         self._require_position(x, y, current)
 
-        if not self._terrain_allows_movement(current.terrain[y][x], model.data["Tipo"]):
+        if not self._terrain_allows_movement(current.terrain[y][x], model.data["Type"]):
             raise EngineError(
-                "POSICAO_INVALIDA",
+                "INVALID_POSITION",
                 f"Terrain {current.terrain[y][x]} does not allow this entity.",
             )
 
@@ -531,19 +531,19 @@ class Engine:
         self._instances[instance_id] = instance
         return instance_id
 
-    def listar_entidades_no_banco(self) -> list[int]:
+    def list_entity_models(self) -> list[int]:
         return list(self.entity_models.keys())
 
-    def listar_entidades_no_mapa(self) -> list[str]:
+    def list_map_entities(self) -> list[str]:
         current = self._require_current_map()
         return list(current.entity_instances.keys())
 
-    def remover_entidade_do_mapa(self, instance_id: str) -> dict:
+    def remove_entity_from_map(self, instance_id: str) -> dict:
         instance = self._require_instance(instance_id)
         current = self._require_current_map()
         if instance_id not in current.entity_instances:
             raise EngineError(
-                "ID_INEXISTENTE",
+                "ID_NOT_FOUND",
                 f"Entity instance {instance_id} is not in the current map.",
             )
 
@@ -561,51 +561,51 @@ class Engine:
     # Entity queries
     # -----------------------------------------------------------------------
 
-    def consultar_entidade(self, instance_id: str) -> dict:
+    def get_entity(self, instance_id: str) -> dict:
         instance = self._require_instance(instance_id)
         return self._entity_snapshot(instance)
 
-    def consultar_dados_basicos(self, instance_id: str) -> dict:
+    def get_basic_data(self, instance_id: str) -> dict:
         instance = self._require_instance(instance_id)
         data = instance.data
-        if data["Tipo"] == "STATIC":
+        if data["Type"] == "STATIC":
             return {
-                "Tipo": "STATIC",
-                "Nome": data["Nome"],
+                "Type": "STATIC",
+                "Name": data["Name"],
                 "X": instance.x,
                 "Y": instance.y,
             }
 
         return {
-            "Tipo": data["Tipo"],
-            "Nome": data["Nome"],
+            "Type": data["Type"],
+            "Name": data["Name"],
             "HP": data["HP"],
             "HPMax": data["HPMax"],
             "AC": data["AC"],
             "XP": data["XP"],
-            "Atributos": deep_copy(data["Atributos"]),
-            "Proficiencias": deep_copy(data.get("Proficiencias", {})),
-            "Condicoes": self.listar_condicoes(instance_id),
+            "Attributes": deep_copy(data["Attributes"]),
+            "Proficiencies": deep_copy(data.get("Proficiencies", {})),
+            "Conditions": self.list_conditions(instance_id),
         }
 
-    def consultar_dado_basico(self, instance_id: str, field_name: str) -> Any:
+    def get_basic_field(self, instance_id: str, field_name: str) -> Any:
         instance = self._require_instance(instance_id)
-        if field_name == "Condicoes":
-            return self.listar_condicoes(instance_id)
+        if field_name == "Conditions":
+            return self.list_conditions(instance_id)
         if field_name not in instance.data:
-            raise EngineError("ID_INEXISTENTE", f"Field {field_name} does not exist.")
+            raise EngineError("ID_NOT_FOUND", f"Field {field_name} does not exist.")
         return deep_copy(instance.data[field_name])
 
     def _entity_snapshot(self, instance: EntityInstance) -> dict:
         snapshot = deep_copy(instance.data)
         snapshot.update({
-            "InstanciaID": instance.instance_id,
-            "ModeloID": instance.model_id,
+            "InstanceID": instance.instance_id,
+            "ModelID": instance.model_id,
             "X": instance.x,
             "Y": instance.y,
-            "Inventario": list(instance.inventory.keys()),
-            "Habilidades": list(instance.abilities),
-            "Condicoes": self.listar_condicoes(instance.instance_id),
+            "Inventory": list(instance.inventory.keys()),
+            "Abilities": list(instance.abilities),
+            "Conditions": self.list_conditions(instance.instance_id),
         })
         return snapshot
 
@@ -613,7 +613,7 @@ class Engine:
     # Movement / status / attributes
     # -----------------------------------------------------------------------
 
-    def definir_posicao(self, instance_id: str, x: int, y: int) -> dict:
+    def set_position(self, instance_id: str, x: int, y: int) -> dict:
         instance = self._require_instance(instance_id)
         current = self._require_current_map()
 
@@ -621,13 +621,13 @@ class Engine:
 
         if self._has_blocking_condition(instance):
             raise EngineError(
-                "ACAO_INDISPONIVEL",
+                "ACTION_UNAVAILABLE",
                 "The entity cannot move because of an active condition.",
             )
 
-        if not self._terrain_allows_movement(current.terrain[y][x], instance.data["Tipo"]):
+        if not self._terrain_allows_movement(current.terrain[y][x], instance.data["Type"]):
             raise EngineError(
-                "POSICAO_INVALIDA",
+                "INVALID_POSITION",
                 f"Terrain {current.terrain[y][x]} does not permit movement.",
             )
 
@@ -644,15 +644,15 @@ class Engine:
             return False
         return True
 
-    def alterar_status(self, instance_id: str, status: str, modifier: int) -> int:
+    def modify_status(self, instance_id: str, status: str, modifier: int) -> int:
         instance = self._require_instance(instance_id)
-        if instance.data["Tipo"] == "STATIC":
-            raise EngineError("ACAO_INDISPONIVEL", "Static entities have no character status.")
+        if instance.data["Type"] == "STATIC":
+            raise EngineError("ACTION_UNAVAILABLE", "Static entities have no character status.")
 
         if status not in STATUSES:
-            raise EngineError("VALOR_INVALIDO", f"Invalid status: {status}.")
+            raise EngineError("INVALID_VALUE", f"Invalid status: {status}.")
         if not isinstance(modifier, int):
-            raise EngineError("ARGUMENTO_INVALIDO", "MOD must be an integer.")
+            raise EngineError("INVALID_ARGUMENT", "MOD must be an integer.")
 
         old = int(instance.data[status])
         new = old + modifier
@@ -671,119 +671,119 @@ class Engine:
 
         return int(instance.data[status])
 
-    def alterar_atributo(self, instance_id: str, attribute: str, modifier: int) -> int:
+    def modify_attribute(self, instance_id: str, attribute: str, modifier: int) -> int:
         instance = self._require_instance(instance_id)
-        if instance.data["Tipo"] == "STATIC":
-            raise EngineError("ACAO_INDISPONIVEL", "Static entities have no attributes.")
+        if instance.data["Type"] == "STATIC":
+            raise EngineError("ACTION_UNAVAILABLE", "Static entities have no attributes.")
         if attribute not in ATTRIBUTES:
-            raise EngineError("VALOR_INVALIDO", f"Invalid attribute: {attribute}.")
+            raise EngineError("INVALID_VALUE", f"Invalid attribute: {attribute}.")
         if not isinstance(modifier, int):
-            raise EngineError("ARGUMENTO_INVALIDO", "MOD must be an integer.")
+            raise EngineError("INVALID_ARGUMENT", "MOD must be an integer.")
 
-        instance.data["Atributos"][attribute] += modifier
-        return instance.data["Atributos"][attribute]
+        instance.data["Attributes"][attribute] += modifier
+        return instance.data["Attributes"][attribute]
 
     # -----------------------------------------------------------------------
     # Entity actions
     # -----------------------------------------------------------------------
 
-    def listar_acoes_da_entidade(self, instance_id: str) -> dict:
+    def list_entity_actions(self, instance_id: str) -> dict:
         instance = self._require_instance(instance_id)
 
         actions = {
-            "DefinirPosicao": {
+            "SetPosition": {
                 "Args": {"X": "int", "Y": "int"},
-                "Retorno": "void",
+                "Return": "void",
             }
         }
 
-        if instance.data["Tipo"] in {"PLAYER", "NPC"}:
+        if instance.data["Type"] in {"PLAYER", "NPC"}:
             actions.update({
-                "AlterarStatus": {
-                    "Args": {"Status": "HP|HPMax|AC|XP", "Modificador": "int"},
-                    "Retorno": "int",
+                "ModifyStatus": {
+                    "Args": {"Status": "HP|HPMax|AC|XP", "Modifier": "int"},
+                    "Return": "int",
                 },
-                "AlterarAtributo": {
-                    "Args": {"Atributo": "FOR|AGI|INT|PRE|CONS", "Modificador": "int"},
-                    "Retorno": "int",
+                "ModifyAttribute": {
+                    "Args": {"Attribute": "STR|DEX|INT|CHA|CON", "Modifier": "int"},
+                    "Return": "int",
                 },
-                "AplicarTeste": {
-                    "Args": {"Atributo": "FOR|AGI|INT|PRE|CONS", "Contexto": "string?"},
-                    "Retorno": "object",
+                "MakeAttributeCheck": {
+                    "Args": {"Attribute": "STR|DEX|INT|CHA|CON", "Context": "string?"},
+                    "Return": "object",
                 },
-                "UsarItem": {
+                "UseItem": {
                     "Args": {"Item": "string", "Args": "object"},
-                    "Retorno": "object",
+                    "Return": "object",
                 },
-                "AplicarCondicao": {
-                    "Args": {"Condicao": "object", "Config": "object?"},
-                    "Retorno": "object",
+                "ApplyCondition": {
+                    "Args": {"Condition": "object", "Config": "object?"},
+                    "Return": "object",
                 },
             })
 
         return actions
 
-    def manipular_entidade(self, instance_id: str, action: str, args: dict) -> Any:
+    def handle_entity_action(self, instance_id: str, action: str, args: dict) -> Any:
         self._require_instance(instance_id)
-        if action not in self.listar_acoes_da_entidade(instance_id):
-            raise EngineError("ACAO_INEXISTENTE", f"Action {action} does not exist for this entity.")
+        if action not in self.list_entity_actions(instance_id):
+            raise EngineError("ACTION_NOT_FOUND", f"Action {action} does not exist for this entity.")
 
         if not isinstance(args, dict):
-            raise EngineError("ARGUMENTO_INVALIDO", "Args must be an object.")
+            raise EngineError("INVALID_ARGUMENT", "Args must be an object.")
 
-        if action == "DefinirPosicao":
-            return self.definir_posicao(instance_id, args.get("X"), args.get("Y"))
-        if action == "AlterarStatus":
-            return self.alterar_status(instance_id, args.get("Status"), args.get("Modificador"))
-        if action == "AlterarAtributo":
-            return self.alterar_atributo(instance_id, args.get("Atributo"), args.get("Modificador"))
-        if action == "AplicarTeste":
-            return self.aplicar_teste(instance_id, args.get("Atributo"), args.get("Contexto"))
-        if action == "UsarItem":
-            return self.usar_item_ou_habilidade(instance_id, args.get("Item"), args)
-        if action == "AplicarCondicao":
-            return self.aplicar_condicao(instance_id, args.get("Condicao"), args.get("Config"))
+        if action == "SetPosition":
+            return self.set_position(instance_id, args.get("X"), args.get("Y"))
+        if action == "ModifyStatus":
+            return self.modify_status(instance_id, args.get("Status"), args.get("Modifier"))
+        if action == "ModifyAttribute":
+            return self.modify_attribute(instance_id, args.get("Attribute"), args.get("Modifier"))
+        if action == "MakeAttributeCheck":
+            return self.make_attribute_check(instance_id, args.get("Attribute"), args.get("Context"))
+        if action == "UseItem":
+            return self.use_item_or_ability(instance_id, args.get("Item"), args)
+        if action == "ApplyCondition":
+            return self.apply_condition(instance_id, args.get("Condition"), args.get("Config"))
 
-        raise EngineError("ACAO_INEXISTENTE", f"Unsupported action: {action}.")
+        raise EngineError("ACTION_NOT_FOUND", f"Unsupported action: {action}.")
 
     # -----------------------------------------------------------------------
     # Tests
     # -----------------------------------------------------------------------
 
-    def aplicar_teste(self, instance_id: str, attribute: str, context: Optional[str] = None) -> dict:
+    def make_attribute_check(self, instance_id: str, attribute: str, context: Optional[str] = None) -> dict:
         instance = self._require_instance(instance_id)
-        if instance.data["Tipo"] == "STATIC":
-            raise EngineError("ACAO_INDISPONIVEL", "Static entities cannot make attribute tests.")
+        if instance.data["Type"] == "STATIC":
+            raise EngineError("ACTION_UNAVAILABLE", "Static entities cannot make attribute tests.")
         if attribute not in ATTRIBUTES:
-            raise EngineError("VALOR_INVALIDO", f"Invalid attribute: {attribute}.")
+            raise EngineError("INVALID_VALUE", f"Invalid attribute: {attribute}.")
 
-        die = self.rolar_dado(20)
-        attribute_modifier = int(instance.data["Atributos"].get(attribute, 0))
+        die = self.roll_dice(20)
+        attribute_modifier = int(instance.data["Attributes"].get(attribute, 0))
         proficiency_modifier = 0
         proficiency_name = None
 
         if context:
-            for name, proficiency in instance.data.get("Proficiencias", {}).items():
+            for name, proficiency in instance.data.get("Proficiencies", {}).items():
                 if not isinstance(proficiency, dict):
                     continue
                 if self._proficiency_matches(proficiency, context):
-                    modifier = int(proficiency.get("Modificador", 0))
+                    modifier = int(proficiency.get("Modifier", 0))
                     if modifier > proficiency_modifier:
                         proficiency_modifier = modifier
                         proficiency_name = name
 
         result = die + attribute_modifier + proficiency_modifier
         return {
-            "Dado": die,
-            "Atributo": attribute_modifier,
-            "Proficiencia": proficiency_modifier,
-            "ProficienciaNome": proficiency_name,
-            "Resultado": result,
+            "Roll": die,
+            "Attribute": attribute_modifier,
+            "Proficiency": proficiency_modifier,
+            "ProficiencyName": proficiency_name,
+            "Result": result,
         }
 
     @staticmethod
     def _proficiency_matches(proficiency: dict, context: str) -> bool:
-        keywords = set(re.findall(r"[A-Za-zÀ-ÿ0-9]+", str(proficiency.get("Contexto", "")).lower()))
+        keywords = set(re.findall(r"[A-Za-zÀ-ÿ0-9]+", str(proficiency.get("Context", "")).lower()))
         context_words = set(re.findall(r"[A-Za-zÀ-ÿ0-9]+", context.lower()))
         return bool(keywords & context_words)
 
@@ -791,10 +791,10 @@ class Engine:
     # Inventory
     # -----------------------------------------------------------------------
 
-    def inserir_item_no_inventario(self, entity_instance_id: str, item_id: int) -> str:
+    def add_item_to_inventory(self, entity_instance_id: str, item_id: int) -> str:
         entity = self._require_instance(entity_instance_id)
-        if entity.data["Tipo"] == "STATIC":
-            raise EngineError("ACAO_INDISPONIVEL", "Static entities cannot have inventories.")
+        if entity.data["Type"] == "STATIC":
+            raise EngineError("ACTION_UNAVAILABLE", "Static entities cannot have inventories.")
 
         model = self._require_item_model(item_id)
 
@@ -809,20 +809,20 @@ class Engine:
         self._item_instances[instance_id] = (entity_instance_id, item)
         return instance_id
 
-    def remover_item_do_inventario(self, entity_instance_id: str, item_instance_id: str) -> dict:
+    def remove_item_from_inventory(self, entity_instance_id: str, item_instance_id: str) -> dict:
         entity = self._require_instance(entity_instance_id)
         if item_instance_id not in entity.inventory:
-            raise EngineError("ID_INEXISTENTE", f"Item instance {item_instance_id} is not in the inventory.")
+            raise EngineError("ID_NOT_FOUND", f"Item instance {item_instance_id} is not in the inventory.")
 
         entity.inventory.pop(item_instance_id)
         self._item_instances.pop(item_instance_id, None)
         return success()
 
-    def listar_itens_no_inventario(self, entity_instance_id: str) -> list[str]:
+    def list_inventory_items(self, entity_instance_id: str) -> list[str]:
         entity = self._require_instance(entity_instance_id)
         return list(entity.inventory.keys())
 
-    def listar_habilidades(self, entity_instance_id: str) -> list[int]:
+    def list_abilities(self, entity_instance_id: str) -> list[int]:
         entity = self._require_instance(entity_instance_id)
         return list(entity.abilities)
 
@@ -830,63 +830,63 @@ class Engine:
     # Items and abilities
     # -----------------------------------------------------------------------
 
-    def listar_itens_no_banco(self) -> list[int]:
+    def list_item_models(self) -> list[int]:
         return list(self.item_models.keys())
 
-    def listar_habilidades_no_banco(self) -> list[int]:
+    def list_ability_models(self) -> list[int]:
         return [
             item_id
             for item_id, model in self.item_models.items()
-            if model.data.get("Tipo") == "HABILIDADE"
+            if model.data.get("Type") == "ABILITY"
         ]
 
-    def consultar_item_ou_habilidade(self, object_id: int) -> dict:
+    def get_item_or_ability(self, object_id: int) -> dict:
         model = self._require_item_model(object_id)
         return {
-            "ModeloID": model.item_id,
+            "ModelID": model.item_id,
             **deep_copy(model.data),
         }
 
-    def criar_item_ou_habilidade(self, config: dict) -> int:
+    def create_item_or_ability(self, config: dict) -> int:
         if not isinstance(config, dict):
-            raise EngineError("ARGUMENTO_INVALIDO", "CONFIG must be an object.")
+            raise EngineError("INVALID_ARGUMENT", "CONFIG must be an object.")
 
-        object_type = config.get("Tipo")
-        if object_type not in {"ITEM", "HABILIDADE"}:
-            raise EngineError("VALOR_INVALIDO", "Tipo must be ITEM or HABILIDADE.")
+        object_type = config.get("Type")
+        if object_type not in {"ITEM", "ABILITY"}:
+            raise EngineError("INVALID_VALUE", "Type must be ITEM or ABILITY.")
 
-        if not config.get("Nome"):
-            raise EngineError("VALOR_INVALIDO", "The object must have a Nome.")
+        if not config.get("Name"):
+            raise EngineError("INVALID_VALUE", "The object must have a Name.")
 
-        functionality = config.get("Funcionalidade")
+        functionality = config.get("Functionality")
         if functionality not in FUNCTIONALITIES:
             raise EngineError(
-                "VALOR_INVALIDO",
-                f"Funcionalidade must be one of {sorted(FUNCTIONALITIES)}.",
+                "INVALID_VALUE",
+                f"Functionality must be one of {sorted(FUNCTIONALITIES)}.",
             )
 
         data = deep_copy(config)
-        data.setdefault("Raridade", 1)
-        data.setdefault("QuantidadeUsos", None)
-        data.setdefault("Parametros", {})
+        data.setdefault("Rarity", 1)
+        data.setdefault("Uses", None)
+        data.setdefault("Parameters", {})
 
         object_id = self._next_item_id
         self._next_item_id += 1
         self.item_models[object_id] = ItemModel(object_id, data)
         return object_id
 
-    def atribuir_habilidade(self, entity_instance_id: str, ability_id: int) -> dict:
+    def assign_ability(self, entity_instance_id: str, ability_id: int) -> dict:
         entity = self._require_instance(entity_instance_id)
         model = self._require_item_model(ability_id)
 
-        if model.data.get("Tipo") != "HABILIDADE":
-            raise EngineError("VALOR_INVALIDO", "The selected model is not a HABILIDADE.")
+        if model.data.get("Type") != "ABILITY":
+            raise EngineError("INVALID_VALUE", "The selected model is not a ABILITY.")
 
         if ability_id not in entity.abilities:
             entity.abilities.append(ability_id)
         return success()
 
-    def usar_item_ou_habilidade(
+    def use_item_or_ability(
         self,
         entity_instance_id: str,
         item_instance_id: str,
@@ -894,13 +894,13 @@ class Engine:
     ) -> dict:
         """Use an inventory item instance.
 
-        For abilities, use `usar_habilidade` with the model ID.
+        For abilities, use `use_ability` with the model ID.
         """
         args = args or {}
         entity = self._require_instance(entity_instance_id)
 
         if item_instance_id not in entity.inventory:
-            raise EngineError("ID_INEXISTENTE", f"Item instance {item_instance_id} is not in the inventory.")
+            raise EngineError("ID_NOT_FOUND", f"Item instance {item_instance_id} is not in the inventory.")
 
         item = entity.inventory[item_instance_id]
         return self._execute_effect(
@@ -910,7 +910,7 @@ class Engine:
             consumed_item=item,
         )
 
-    def usar_habilidade(
+    def use_ability(
         self,
         entity_instance_id: str,
         ability_id: int,
@@ -918,10 +918,10 @@ class Engine:
     ) -> dict:
         entity = self._require_instance(entity_instance_id)
         model = self._require_item_model(ability_id)
-        if model.data.get("Tipo") != "HABILIDADE":
-            raise EngineError("VALOR_INVALIDO", "The selected model is not a HABILIDADE.")
+        if model.data.get("Type") != "ABILITY":
+            raise EngineError("INVALID_VALUE", "The selected model is not a ABILITY.")
         if ability_id not in entity.abilities:
-            raise EngineError("ACAO_INDISPONIVEL", "The entity does not possess this ability.")
+            raise EngineError("ACTION_UNAVAILABLE", "The entity does not possess this ability.")
 
         return self._execute_effect(
             source_entity=entity,
@@ -939,96 +939,96 @@ class Engine:
     ) -> dict:
         if self._has_blocking_condition(source_entity):
             raise EngineError(
-                "ACAO_INDISPONIVEL",
+                "ACTION_UNAVAILABLE",
                 "The entity cannot perform actions because of an active condition.",
             )
 
-        uses = model_data.get("QuantidadeUsos")
+        uses = model_data.get("Uses")
         if consumed_item is not None and uses is not None:
             if int(uses) <= 0:
-                raise EngineError("ACAO_INDISPONIVEL", "This item has no uses remaining.")
+                raise EngineError("ACTION_UNAVAILABLE", "This item has no uses remaining.")
 
-        functionality = model_data["Funcionalidade"]
-        params = deep_copy(model_data.get("Parametros", {}))
+        functionality = model_data["Functionality"]
+        params = deep_copy(model_data.get("Parameters", {}))
 
-        if functionality == "NARRATIVO":
+        if functionality == "NARRATIVE":
             result = {
-                "Sucesso": True,
-                "Tipo": "NARRATIVO",
-                "Efeito": params.get("Efeito", ""),
-                "ContextoAtivacao": params.get("ContextoAtivacao", ""),
+                "Success": True,
+                "Type": "NARRATIVE",
+                "Effect": params.get("Effect", ""),
+                "ActivationContext": params.get("ActivationContext", ""),
             }
-        elif functionality == "PASSIVO":
+        elif functionality == "PASSIVE":
             result = self._execute_passive(source_entity, params)
-        elif functionality == "USO_SIMPLES":
+        elif functionality == "SIMPLE_USE":
             result = self._execute_simple_use(source_entity, params)
-        elif functionality == "EFEITO_EM_ALVO":
+        elif functionality == "TARGET_EFFECT":
             result = self._execute_target_effect(source_entity, params, args)
-        elif functionality == "EFEITO_EM_POSICAO":
+        elif functionality == "POSITION_EFFECT":
             result = self._execute_position_effect(source_entity, params, args)
         else:
-            raise EngineError("VALOR_INVALIDO", "Unknown functionality.")
+            raise EngineError("INVALID_VALUE", "Unknown functionality.")
 
         if consumed_item is not None and uses is not None:
-            consumed_item.data["QuantidadeUsos"] = int(uses) - 1
+            consumed_item.data["Uses"] = int(uses) - 1
 
         self._advance_action(source_entity.instance_id)
         return result
 
     def _execute_passive(self, entity: EntityInstance, params: dict) -> dict:
-        attribute = params.get("AtributoAlvo")
-        modifier = int(self.calcular_expressao(str(params.get("Modificador", 0))))
+        attribute = params.get("TargetAttribute")
+        modifier = int(self.evaluate_expression(str(params.get("Modifier", 0))))
         if attribute not in ATTRIBUTES:
-            raise EngineError("VALOR_INVALIDO", "Passive AtributoAlvo must be an attribute.")
-        new_value = self.alterar_atributo(entity.instance_id, attribute, modifier)
+            raise EngineError("INVALID_VALUE", "Passive TargetAttribute must be an attribute.")
+        new_value = self.modify_attribute(entity.instance_id, attribute, modifier)
         return {
-            "Sucesso": True,
-            "Tipo": "PASSIVO",
-            "Atributo": attribute,
-            "Modificador": modifier,
-            "NovoValor": new_value,
+            "Success": True,
+            "Type": "PASSIVE",
+            "Attribute": attribute,
+            "Modifier": modifier,
+            "NewValue": new_value,
         }
 
     def _execute_simple_use(self, entity: EntityInstance, params: dict) -> dict:
-        status = params.get("AtributoAlvo")
+        status = params.get("TargetAttribute")
         if status not in STATUSES:
-            raise EngineError("VALOR_INVALIDO", "USO_SIMPLES requires a valid status target.")
-        modifier = int(self.calcular_expressao(str(params.get("Modificador", 0))))
+            raise EngineError("INVALID_VALUE", "SIMPLE_USE requires a valid status target.")
+        modifier = int(self.evaluate_expression(str(params.get("Modifier", 0))))
         old = entity.data[status]
-        new = self.alterar_status(entity.instance_id, status, modifier)
+        new = self.modify_status(entity.instance_id, status, modifier)
         return {
-            "Sucesso": True,
-            "Tipo": "USO_SIMPLES",
-            "AtributoAlvo": status,
-            "Dado": modifier,
-            "HPAnterior": old if status == "HP" else None,
-            "NovoValor": new,
+            "Success": True,
+            "Type": "SIMPLE_USE",
+            "TargetAttribute": status,
+            "Roll": modifier,
+            "PreviousHP": old if status == "HP" else None,
+            "NewValue": new,
         }
 
     def _execute_target_effect(self, source_entity: EntityInstance, params: dict, args: dict) -> dict:
-        target_id = args.get("Alvo", params.get("Alvo"))
+        target_id = args.get("Target", params.get("Target"))
         if target_id is None:
-            raise EngineError("ALVO_INVALIDO", "EFEITO_EM_ALVO requires Alvo.")
+            raise EngineError("INVALID_TARGET", "TARGET_EFFECT requires Target.")
 
         target = self._require_instance(str(target_id))
-        target_status = params.get("AtributoAlvo")
+        target_status = params.get("TargetAttribute")
         if target_status not in STATUSES:
-            raise EngineError("VALOR_INVALIDO", "Target effect requires a valid status target.")
+            raise EngineError("INVALID_VALUE", "Target effect requires a valid status target.")
 
-        modifier = int(self.calcular_expressao(str(params.get("Modificador", 0))))
+        modifier = int(self.evaluate_expression(str(params.get("Modifier", 0))))
         previous = int(target.data[target_status])
-        new = self.alterar_status(target.instance_id, target_status, modifier)
+        new = self.modify_status(target.instance_id, target_status, modifier)
 
         return {
-            "Sucesso": True,
-            "Tipo": "EFEITO_EM_ALVO",
-            "Alvo": target.instance_id,
-            "AtributoAlvo": target_status,
-            "Dado": abs(modifier),
-            "Modificador": modifier,
-            "HPAnterior": previous if target_status == "HP" else None,
-            "HPAtual": new if target_status == "HP" else None,
-            "NovoValor": new,
+            "Success": True,
+            "Type": "TARGET_EFFECT",
+            "Target": target.instance_id,
+            "TargetAttribute": target_status,
+            "Roll": abs(modifier),
+            "Modifier": modifier,
+            "PreviousHP": previous if target_status == "HP" else None,
+            "CurrentHP": new if target_status == "HP" else None,
+            "NewValue": new,
         }
 
     def _execute_position_effect(self, source_entity: EntityInstance, params: dict, args: dict) -> dict:
@@ -1037,36 +1037,36 @@ class Engine:
         current = self._require_current_map()
         self._require_position(x, y, current)
 
-        target_status = params.get("AtributoAlvo")
-        modifier_expression = str(params.get("Modificador", 0))
+        target_status = params.get("TargetAttribute")
+        modifier_expression = str(params.get("Modifier", 0))
         affected = []
 
         for target in current.entity_instances.values():
-            if target.x == x and target.y == y and target.data["Tipo"] in {"PLAYER", "NPC"}:
+            if target.x == x and target.y == y and target.data["Type"] in {"PLAYER", "NPC"}:
                 if target_status not in STATUSES:
-                    raise EngineError("VALOR_INVALIDO", "Position effect requires a valid status target.")
-                modifier = int(self.calcular_expressao(modifier_expression))
+                    raise EngineError("INVALID_VALUE", "Position effect requires a valid status target.")
+                modifier = int(self.evaluate_expression(modifier_expression))
                 previous = int(target.data[target_status])
-                new = self.alterar_status(target.instance_id, target_status, modifier)
+                new = self.modify_status(target.instance_id, target_status, modifier)
                 affected.append({
-                    "InstanciaID": target.instance_id,
-                    "Anterior": previous,
-                    "Atual": new,
+                    "InstanceID": target.instance_id,
+                    "Previous": previous,
+                    "Current": new,
                 })
 
         return {
-            "Sucesso": True,
-            "Tipo": "EFEITO_EM_POSICAO",
+            "Success": True,
+            "Type": "POSITION_EFFECT",
             "X": x,
             "Y": y,
-            "Afetados": affected,
+            "Affected": affected,
         }
 
     # -----------------------------------------------------------------------
     # Conditions
     # -----------------------------------------------------------------------
 
-    def aplicar_condicao(
+    def apply_condition(
         self,
         instance_id: str,
         condition: str | dict,
@@ -1078,49 +1078,49 @@ class Engine:
             definition = deep_copy(condition)
         else:
             definition = {
-                "Nome": condition,
+                "Name": condition,
                 **deep_copy(config or {}),
             }
 
-        name = definition.get("Nome")
+        name = definition.get("Name")
         if not name:
-            raise EngineError("VALOR_INVALIDO", "Condition must have a Nome.")
+            raise EngineError("INVALID_VALUE", "Condition must have a Name.")
 
-        duration = definition.get("Duracao")
+        duration = definition.get("Duration")
         if duration is not None:
             if not isinstance(duration, int) or duration < 0:
-                raise EngineError("VALOR_INVALIDO", "Condition duration must be a non-negative integer.")
+                raise EngineError("INVALID_VALUE", "Condition duration must be a non-negative integer.")
 
-        duration_unit = definition.get("UnidadeDuracao", "ACOES")
+        duration_unit = definition.get("DurationUnit", "ACTIONS")
         if duration_unit not in CONDITION_DURATION_UNITS:
-            raise EngineError("VALOR_INVALIDO", "Invalid condition duration unit.")
+            raise EngineError("INVALID_VALUE", "Invalid condition duration unit.")
 
-        effect = deep_copy(definition.get("Efeito", {}))
-        rules = deep_copy(definition.get("Regras", {}))
+        effect = deep_copy(definition.get("Effect", {}))
+        rules = deep_copy(definition.get("Rules", {}))
 
         # Explicit condition definitions from the specification.
         defaults = {
-            "PegandoFogo": {"Duracao": 5, "UnidadeDuracao": "ACOES", "Efeito": {"HP": "-1d4"}},
-            "Congelado": {"Duracao": None, "UnidadeDuracao": "INDEFINIDO", "Efeito": {},
-                          "Regras": {"BloqueiaMovimento": True, "BloqueiaAcoes": True}},
-            "Envenenado": {"Duracao": 3, "UnidadeDuracao": "ACOES", "Efeito": {"HP": "-1d8"}},
-            "Paralisado": {"Duracao": None, "UnidadeDuracao": "INDEFINIDO", "Efeito": {},
-                           "Regras": {"BloqueiaMovimento": True, "BloqueiaAcoes": True}},
-            "Desmaiado": {"Duracao": None, "UnidadeDuracao": "INDEFINIDO", "Efeito": {},
-                          "Regras": {"BloqueiaMovimento": True, "BloqueiaAcoes": True}},
-            "Enlouquecido": {"Duracao": None, "UnidadeDuracao": "INDEFINIDO", "Efeito": {},
-                             "Regras": {"PerdeControle": True}},
+            "OnFire": {"Duration": 5, "DurationUnit": "ACTIONS", "Effect": {"HP": "-1d4"}},
+            "Frozen": {"Duration": None, "DurationUnit": "INDEFINITE", "Effect": {},
+                          "Rules": {"BlocksMovement": True, "BlocksActions": True}},
+            "Poisoned": {"Duration": 3, "DurationUnit": "ACTIONS", "Effect": {"HP": "-1d8"}},
+            "Paralyzed": {"Duration": None, "DurationUnit": "INDEFINITE", "Effect": {},
+                           "Rules": {"BlocksMovement": True, "BlocksActions": True}},
+            "Unconscious": {"Duration": None, "DurationUnit": "INDEFINITE", "Effect": {},
+                          "Rules": {"BlocksMovement": True, "BlocksActions": True}},
+            "Insane": {"Duration": None, "DurationUnit": "INDEFINITE", "Effect": {},
+                             "Rules": {"LosesControl": True}},
         }
 
         if name in defaults:
             default = defaults[name]
             if duration is None:
-                duration = default["Duracao"]
-            if duration_unit == "ACOES" and default["UnidadeDuracao"] != "ACOES":
-                duration_unit = default["UnidadeDuracao"]
+                duration = default["Duration"]
+            if duration_unit == "ACTIONS" and default["DurationUnit"] != "ACTIONS":
+                duration_unit = default["DurationUnit"]
             if not effect:
-                effect = default["Efeito"]
-            merged_rules = deep_copy(default.get("Regras", {}))
+                effect = default["Effect"]
+            merged_rules = deep_copy(default.get("Rules", {}))
             merged_rules.update(rules)
             rules = merged_rules
 
@@ -1135,32 +1135,32 @@ class Engine:
         )
 
         # Fire + Frozen explicitly cancel each other.
-        if name in {"PegandoFogo", "Congelado"}:
-            opposite = "Congelado" if name == "PegandoFogo" else "PegandoFogo"
+        if name in {"OnFire", "Frozen"}:
+            opposite = "Frozen" if name == "OnFire" else "OnFire"
             for cid, active in list(entity.conditions.items()):
                 if active.name == opposite:
                     self._remove_condition_internal(entity, cid)
                     return {
-                        "Sucesso": True,
-                        "Condicao": name,
-                        "Interacao": f"{name}+{opposite} removed both conditions.",
+                        "Success": True,
+                        "Condition": name,
+                        "Interaction": f"{name}+{opposite} removed both conditions.",
                     }
 
         entity.conditions[condition_id] = instance
         self._conditions[condition_id] = (instance_id, instance)
 
         return {
-            "Sucesso": True,
-            "CondicaoID": condition_id,
-            "Nome": name,
-            "Duracao": duration,
-            "UnidadeDuracao": duration_unit,
+            "Success": True,
+            "ConditionID": condition_id,
+            "Name": name,
+            "Duration": duration,
+            "DurationUnit": duration_unit,
         }
 
-    def remover_condicao(self, instance_id: str, condition_id: str) -> dict:
+    def remove_condition(self, instance_id: str, condition_id: str) -> dict:
         entity = self._require_instance(instance_id)
         if condition_id not in entity.conditions:
-            raise EngineError("ID_INEXISTENTE", f"Condition {condition_id} is not active.")
+            raise EngineError("ID_NOT_FOUND", f"Condition {condition_id} is not active.")
         self._remove_condition_internal(entity, condition_id)
         return success()
 
@@ -1168,26 +1168,26 @@ class Engine:
         entity.conditions.pop(condition_id, None)
         self._conditions.pop(condition_id, None)
 
-    def listar_condicoes(self, instance_id: str) -> list[dict]:
+    def list_conditions(self, instance_id: str) -> list[dict]:
         entity = self._require_instance(instance_id)
         return [
             {
-                "CondicaoID": c.condition_id,
-                "Nome": c.name,
-                "Duracao": c.duration,
-                "UnidadeDuracao": c.duration_unit,
-                "Efeito": deep_copy(c.effect),
-                "Regras": deep_copy(c.rules),
+                "ConditionID": c.condition_id,
+                "Name": c.name,
+                "Duration": c.duration,
+                "DurationUnit": c.duration_unit,
+                "Effect": deep_copy(c.effect),
+                "Rules": deep_copy(c.rules),
             }
             for c in entity.conditions.values()
         ]
 
-    def alterar_duracao_condicao(self, condition_id: str, duration: Optional[int]) -> dict:
+    def change_condition_duration(self, condition_id: str, duration: Optional[int]) -> dict:
         if condition_id not in self._conditions:
-            raise EngineError("ID_INEXISTENTE", f"Condition {condition_id} does not exist.")
+            raise EngineError("ID_NOT_FOUND", f"Condition {condition_id} does not exist.")
 
         if duration is not None and (not isinstance(duration, int) or duration < 0):
-            raise EngineError("VALOR_INVALIDO", "Duration must be a non-negative integer or None.")
+            raise EngineError("INVALID_VALUE", "Duration must be a non-negative integer or None.")
 
         _, condition = self._conditions[condition_id]
         condition.duration = duration
@@ -1195,7 +1195,7 @@ class Engine:
 
     def _has_blocking_condition(self, entity: EntityInstance) -> bool:
         return any(
-            c.rules.get("BloqueiaAcoes") or c.rules.get("BloqueiaMovimento")
+            c.rules.get("BlocksActions") or c.rules.get("BlocksMovement")
             for c in entity.conditions.values()
         )
 
@@ -1205,11 +1205,11 @@ class Engine:
 
         for condition_id, condition in list(entity.conditions.items()):
             # Conditions with HP effects apply once per action.
-            if condition.duration_unit == "ACOES":
+            if condition.duration_unit == "ACTIONS":
                 hp_expression = condition.effect.get("HP")
                 if hp_expression:
-                    damage_or_heal = int(self.calcular_expressao(str(hp_expression)))
-                    self.alterar_status(instance_id, "HP", damage_or_heal)
+                    damage_or_heal = int(self.evaluate_expression(str(hp_expression)))
+                    self.modify_status(instance_id, "HP", damage_or_heal)
 
                 if condition.duration is not None:
                     condition.duration -= 1
@@ -1220,7 +1220,7 @@ class Engine:
     # Convenience combat rule
     # -----------------------------------------------------------------------
 
-    def atacar(
+    def attack(
         self,
         attacker_id: str,
         target_id: str,
@@ -1230,38 +1230,38 @@ class Engine:
         attacker = self._require_instance(attacker_id)
         target = self._require_instance(target_id)
 
-        if attacker.data["Tipo"] == "STATIC" or target.data["Tipo"] == "STATIC":
-            raise EngineError("ALVO_INVALIDO", "Static entities cannot participate in this combat attack.")
+        if attacker.data["Type"] == "STATIC" or target.data["Type"] == "STATIC":
+            raise EngineError("INVALID_TARGET", "Static entities cannot participate in this combat attack.")
 
         if self._has_blocking_condition(attacker):
-            raise EngineError("ACAO_INDISPONIVEL", "Attacker cannot act.")
+            raise EngineError("ACTION_UNAVAILABLE", "Attacker cannot act.")
 
-        roll = self.rolar_dado(20)
+        roll = self.roll_dice(20)
         total_attack = roll + attack_modifier
         hit = total_attack >= int(target.data["AC"])
 
         result = {
-            "Acertou": hit,
-            "Rolagem": roll,
-            "ModificadorAtaque": attack_modifier,
-            "ResultadoAtaque": total_attack,
-            "ACAlvo": target.data["AC"],
+            "Hit": hit,
+            "Roll": roll,
+            "AttackModifier": attack_modifier,
+            "AttackResult": total_attack,
+            "TargetAC": target.data["AC"],
         }
 
         if hit:
-            damage = int(self.calcular_expressao(damage_expression))
+            damage = int(self.evaluate_expression(damage_expression))
             hp_before = int(target.data["HP"])
-            hp_after = self.alterar_status(target_id, "HP", -damage)
+            hp_after = self.modify_status(target_id, "HP", -damage)
             result.update({
-                "Dano": damage,
-                "HPAnterior": hp_before,
-                "HPAtual": hp_after,
+                "Damage": damage,
+                "PreviousHP": hp_before,
+                "CurrentHP": hp_after,
             })
         else:
             result.update({
-                "Dano": 0,
-                "HPAnterior": target.data["HP"],
-                "HPAtual": target.data["HP"],
+                "Damage": 0,
+                "PreviousHP": target.data["HP"],
+                "CurrentHP": target.data["HP"],
             })
 
         self._advance_action(attacker_id)
@@ -1279,56 +1279,56 @@ class Engine:
         details.
         """
         if not isinstance(command_name, str):
-            return EngineError("ARGUMENTO_INVALIDO", "Command name must be a string.").to_dict()
+            return EngineError("INVALID_ARGUMENT", "Command name must be a string.").to_dict()
 
         commands = {
-            "rolar_dado": self.rolar_dado,
-            "calcular_expressao": self.calcular_expressao,
-            "calcular_distancia": self.calcular_distancia,
-            "criar_mapa": self.criar_mapa,
-            "popular_mapa": self.popular_mapa,
-            "listar_mapas": self.listar_mapas,
-            "consultar_mapa_atual": self.consultar_mapa_atual,
-            "consultar_mapa_atual_id": self.consultar_mapa_atual_id,
-            "definir_mapa_atual": self.definir_mapa_atual,
-            "criar_entidade": self.criar_entidade,
-            "criar_entidade_no_mapa": self.criar_entidade_no_mapa,
-            "listar_entidades_no_banco": self.listar_entidades_no_banco,
-            "listar_entidades_no_mapa": self.listar_entidades_no_mapa,
-            "remover_entidade_do_mapa": self.remover_entidade_do_mapa,
-            "listar_acoes_da_entidade": self.listar_acoes_da_entidade,
-            "manipular_entidade": self.manipular_entidade,
-            "aplicar_teste": self.aplicar_teste,
-            "consultar_dados_basicos": self.consultar_dados_basicos,
-            "consultar_dado_basico": self.consultar_dado_basico,
-            "definir_posicao": self.definir_posicao,
-            "alterar_status": self.alterar_status,
-            "alterar_atributo": self.alterar_atributo,
-            "inserir_item_no_inventario": self.inserir_item_no_inventario,
-            "remover_item_do_inventario": self.remover_item_do_inventario,
-            "listar_itens_no_inventario": self.listar_itens_no_inventario,
-            "listar_habilidades": self.listar_habilidades,
-            "listar_itens_no_banco": self.listar_itens_no_banco,
-            "listar_habilidades_no_banco": self.listar_habilidades_no_banco,
-            "consultar_item_ou_habilidade": self.consultar_item_ou_habilidade,
-            "criar_item_ou_habilidade": self.criar_item_ou_habilidade,
-            "atribuir_habilidade": self.atribuir_habilidade,
-            "usar_item_ou_habilidade": self.usar_item_ou_habilidade,
-            "usar_habilidade": self.usar_habilidade,
-            "aplicar_condicao": self.aplicar_condicao,
-            "remover_condicao": self.remover_condicao,
-            "listar_condicoes": self.listar_condicoes,
-            "alterar_duracao_condicao": self.alterar_duracao_condicao,
-            "atacar": self.atacar,
+            "roll_dice": self.roll_dice,
+            "evaluate_expression": self.evaluate_expression,
+            "calculate_distance": self.calculate_distance,
+            "create_map": self.create_map,
+            "populate_map": self.populate_map,
+            "list_maps": self.list_maps,
+            "get_current_map": self.get_current_map,
+            "get_current_map_id": self.get_current_map_id,
+            "set_current_map": self.set_current_map,
+            "create_entity": self.create_entity,
+            "spawn_entity": self.spawn_entity,
+            "list_entity_models": self.list_entity_models,
+            "list_map_entities": self.list_map_entities,
+            "remove_entity_from_map": self.remove_entity_from_map,
+            "list_entity_actions": self.list_entity_actions,
+            "handle_entity_action": self.handle_entity_action,
+            "make_attribute_check": self.make_attribute_check,
+            "get_basic_data": self.get_basic_data,
+            "get_basic_field": self.get_basic_field,
+            "set_position": self.set_position,
+            "modify_status": self.modify_status,
+            "modify_attribute": self.modify_attribute,
+            "add_item_to_inventory": self.add_item_to_inventory,
+            "remove_item_from_inventory": self.remove_item_from_inventory,
+            "list_inventory_items": self.list_inventory_items,
+            "list_abilities": self.list_abilities,
+            "list_item_models": self.list_item_models,
+            "list_ability_models": self.list_ability_models,
+            "get_item_or_ability": self.get_item_or_ability,
+            "create_item_or_ability": self.create_item_or_ability,
+            "assign_ability": self.assign_ability,
+            "use_item_or_ability": self.use_item_or_ability,
+            "use_ability": self.use_ability,
+            "apply_condition": self.apply_condition,
+            "remove_condition": self.remove_condition,
+            "list_conditions": self.list_conditions,
+            "change_condition_duration": self.change_condition_duration,
+            "attack": self.attack,
         }
 
         function = commands.get(command_name)
         if function is None:
-            return EngineError("ACAO_INEXISTENTE", f"Unknown engine command: {command_name}.").to_dict()
+            return EngineError("ACTION_NOT_FOUND", f"Unknown engine command: {command_name}.").to_dict()
 
         try:
             value = function(**kwargs)
-            if isinstance(value, dict) and "Sucesso" in value:
+            if isinstance(value, dict) and "Success" in value:
                 return value
             return success(value)
         except EngineError as error:
@@ -1354,8 +1354,8 @@ def create_demo_engine() -> Engine:
         ["EARTH", "EARTH", "EARTH", "EARTH", "EARTH", "EARTH", "EARTH", "EARTH", "EARTH", "EARTH"],
     ]
 
-    map_id = engine.criar_mapa(10, 8, terrain)
-    engine.popular_mapa(10, 8, [
+    map_id = engine.create_map(10, 8, terrain)
+    engine.populate_map(10, 8, [
         ["NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE"],
         ["NONE", "HOUSE", "HOUSE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE"],
         ["NONE", "HOUSE", "HOUSE", "NONE", "NONE", "NONE", "NONE", "NONE", "STORE", "NONE"],
@@ -1366,85 +1366,85 @@ def create_demo_engine() -> Engine:
         ["NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE"],
     ])
 
-    goblin_id = engine.criar_entidade({
-        "Tipo": "NPC",
-        "Nome": "Goblin",
+    goblin_id = engine.create_entity({
+        "Type": "NPC",
+        "Name": "Goblin",
         "HPMax": 10,
         "HP": 10,
         "AC": 12,
         "XP": 20,
-        "Atributos": {"FOR": 2, "AGI": 3, "INT": 0, "PRE": 0, "CONS": 1},
-        "Proficiencias": {
-            "Sobrevivencia": {
-                "Modificador": 2,
-                "Contexto": "situacoes relacionadas a sobrevivencia",
+        "Attributes": {"STR": 2, "DEX": 3, "INT": 0, "CHA": 0, "CON": 1},
+        "Proficiencies": {
+            "Survival": {
+                "Modifier": 2,
+                "Context": "situations related to survival",
             }
         },
     })
 
-    hero_id = engine.criar_entidade({
-        "Tipo": "PLAYER",
-        "Nome": "Adventurer",
+    hero_id = engine.create_entity({
+        "Type": "PLAYER",
+        "Name": "Adventurer",
         "HPMax": 30,
         "HP": 30,
         "AC": 14,
         "XP": 20,
-        "Atributos": {"FOR": 4, "AGI": 3, "INT": 2, "PRE": 1, "CONS": 4},
-        "Proficiencias": {
-            "Prestidigitação": {
-                "Modificador": 2,
-                "Contexto": "manipulacao manual furtos truques",
+        "Attributes": {"STR": 4, "DEX": 3, "INT": 2, "CHA": 1, "CON": 4},
+        "Proficiencies": {
+            "SleightOfHand": {
+                "Modifier": 2,
+                "Context": "manual manipulation thefts tricks",
             }
         },
     })
 
-    statue_id = engine.criar_entidade({
-        "Tipo": "STATIC",
-        "Nome": "Ancient Statue",
+    statue_id = engine.create_entity({
+        "Type": "STATIC",
+        "Name": "Ancient Statue",
     })
 
-    goblin = engine.criar_entidade_no_mapa(goblin_id, 7, 5)
-    hero = engine.criar_entidade_no_mapa(hero_id, 2, 6)
-    engine.criar_entidade_no_mapa(statue_id, 3, 4)
+    goblin = engine.spawn_entity(goblin_id, 7, 5)
+    hero = engine.spawn_entity(hero_id, 2, 6)
+    engine.spawn_entity(statue_id, 3, 4)
 
-    dagger_id = engine.criar_item_ou_habilidade({
-        "Tipo": "ITEM",
-        "Nome": "Dagger",
-        "Raridade": 1,
-        "Funcionalidade": "EFEITO_EM_ALVO",
-        "QuantidadeUsos": None,
-        "Parametros": {
-            "AtributoAlvo": "HP",
-            "Modificador": "-1d4",
+    dagger_id = engine.create_item_or_ability({
+        "Type": "ITEM",
+        "Name": "Dagger",
+        "Rarity": 1,
+        "Functionality": "TARGET_EFFECT",
+        "Uses": None,
+        "Parameters": {
+            "TargetAttribute": "HP",
+            "Modifier": "-1d4",
         },
     })
 
-    potion_id = engine.criar_item_ou_habilidade({
-        "Tipo": "ITEM",
-        "Nome": "Healing Potion",
-        "Raridade": 1,
-        "Funcionalidade": "USO_SIMPLES",
-        "QuantidadeUsos": 1,
-        "Parametros": {
-            "AtributoAlvo": "HP",
-            "Modificador": "2d4",
+    potion_id = engine.create_item_or_ability({
+        "Type": "ITEM",
+        "Name": "Healing Potion",
+        "Rarity": 1,
+        "Functionality": "SIMPLE_USE",
+        "Uses": 1,
+        "Parameters": {
+            "TargetAttribute": "HP",
+            "Modifier": "2d4",
         },
     })
 
-    fireball_id = engine.criar_item_ou_habilidade({
-        "Tipo": "HABILIDADE",
-        "Nome": "Fire Bolt",
-        "Raridade": 1,
-        "Funcionalidade": "EFEITO_EM_ALVO",
-        "QuantidadeUsos": 10,
-        "Parametros": {
-            "AtributoAlvo": "HP",
-            "Modificador": "-1d6",
+    fireball_id = engine.create_item_or_ability({
+        "Type": "ABILITY",
+        "Name": "Fire Bolt",
+        "Rarity": 1,
+        "Functionality": "TARGET_EFFECT",
+        "Uses": 10,
+        "Parameters": {
+            "TargetAttribute": "HP",
+            "Modifier": "-1d6",
         },
     })
 
-    engine.inserir_item_no_inventario(hero, dagger_id)
-    engine.inserir_item_no_inventario(hero, potion_id)
-    engine.atribuir_habilidade(hero, fireball_id)
+    engine.add_item_to_inventory(hero, dagger_id)
+    engine.add_item_to_inventory(hero, potion_id)
+    engine.assign_ability(hero, fireball_id)
 
     return engine

@@ -26,7 +26,7 @@ D:
     Damage selected entity by 1d6.
 
 F:
-    Apply PegandoFogo to selected entity.
+    Apply OnFire to selected entity.
 
 R:
     Remove all selected entity conditions.
@@ -121,8 +121,8 @@ class RPGEditor:
 
         self.goblins_by_model = [
             model_id
-            for model_id in self.engine.listar_entidades_no_banco()
-            if self.engine.entity_models[model_id].data.get("Nome") == "Goblin"
+            for model_id in self.engine.list_entity_models()
+            if self.engine.entity_models[model_id].data.get("Name") == "Goblin"
         ]
 
     # -----------------------------------------------------------------------
@@ -200,7 +200,7 @@ class RPGEditor:
         title = self.title_font.render("AI RPG ENGINE", True, TEXT)
         self.screen.blit(title, (18, 15))
 
-        current_id = self.engine.consultar_mapa_atual_id()
+        current_id = self.engine.get_current_map_id()
         map_state = self.engine.maps[current_id]
         info = f"Map #{current_id}  {map_state.width}x{map_state.height}"
         text = self.font.render(info, True, MUTED)
@@ -242,10 +242,10 @@ class RPGEditor:
             rect = self.cell_rect(instance.x, instance.y)
             center = rect.center
             radius = max(9, self.cell_size() // 4)
-            color = ENTITY_COLORS.get(instance.data["Tipo"], (255, 255, 255))
+            color = ENTITY_COLORS.get(instance.data["Type"], (255, 255, 255))
             pygame.draw.circle(self.screen, color, center, radius)
 
-            label = self.small_font.render(instance.data["Nome"][:8], True, (15, 15, 18))
+            label = self.small_font.render(instance.data["Name"][:8], True, (15, 15, 18))
             self.screen.blit(label, label.get_rect(center=center))
 
             if instance.instance_id == self.selected_entity:
@@ -294,21 +294,21 @@ class RPGEditor:
 
     def draw_entity_inspector(self, x, y, entity):
         lines = [
-            (entity.data["Nome"], TEXT, self.big_font),
+            (entity.data["Name"], TEXT, self.big_font),
             (f"Instance: {entity.instance_id}", MUTED, self.small_font),
             (f"Model ID: {entity.model_id}", MUTED, self.small_font),
-            (f"Type: {entity.data['Tipo']}", TEXT, self.font),
+            (f"Type: {entity.data['Type']}", TEXT, self.font),
             (f"Position: ({entity.x}, {entity.y})", TEXT, self.font),
         ]
 
-        if entity.data["Tipo"] in {"PLAYER", "NPC"}:
+        if entity.data["Type"] in {"PLAYER", "NPC"}:
             lines.extend([
                 (f"HP: {entity.data['HP']} / {entity.data['HPMax']}", TEXT, self.font),
                 (f"AC: {entity.data['AC']}   XP: {entity.data['XP']}", TEXT, self.font),
             ])
 
             attributes = "  ".join(
-                f"{key}:{value}" for key, value in entity.data["Atributos"].items()
+                f"{key}:{value}" for key, value in entity.data["Attributes"].items()
             )
             lines.append((attributes, TEXT, self.small_font))
 
@@ -347,7 +347,7 @@ class RPGEditor:
         ]
         lines.append((f"Entities: {len(entities)}", self.font, TEXT))
         for entity in entities:
-            lines.append((f"  {entity.data['Nome']} [{entity.instance_id}]", self.small_font, MUTED))
+            lines.append((f"  {entity.data['Name']} [{entity.instance_id}]", self.small_font, MUTED))
 
         for content, font, color in lines:
             surface = font.render(content, True, color)
@@ -407,7 +407,7 @@ class RPGEditor:
                 cell = self.cell_from_mouse(event.pos)
                 if cell and self.selected_entity:
                     try:
-                        self.engine.definir_posicao(self.selected_entity, *cell)
+                        self.engine.set_position(self.selected_entity, *cell)
                         self.selected_cell = cell
                         self.notify(f"Moved {self.selected_entity} to {cell}.", "success")
                     except Exception as exc:
@@ -429,7 +429,7 @@ class RPGEditor:
 
         if entities:
             self.selected_entity = entities[0].instance_id
-            self.notify(f"Selected {entities[0].data['Nome']} ({self.selected_entity}).")
+            self.notify(f"Selected {entities[0].data['Name']} ({self.selected_entity}).")
         else:
             self.selected_entity = None
             self.notify(f"Selected cell {cell}.")
@@ -515,7 +515,7 @@ class RPGEditor:
             return
 
         try:
-            instance_id = self.engine.criar_entidade_no_mapa(
+            instance_id = self.engine.spawn_entity(
                 self.goblins_by_model[0],
                 *self.selected_cell,
             )
@@ -531,13 +531,13 @@ class RPGEditor:
 
         try:
             entity = self.engine._instances[self.selected_entity]
-            if entity.data["Tipo"] == "STATIC":
+            if entity.data["Type"] == "STATIC":
                 self.notify("Static entities do not have HP.", "error")
                 return
-            damage = self.engine.calcular_expressao("1d6")
+            damage = self.engine.evaluate_expression("1d6")
             hp_before = entity.data["HP"]
-            hp_after = self.engine.alterar_status(self.selected_entity, "HP", -int(damage))
-            self.notify(f"{entity.data['Nome']} took {damage} damage: {hp_before} -> {hp_after}.", "success")
+            hp_after = self.engine.modify_status(self.selected_entity, "HP", -int(damage))
+            self.notify(f"{entity.data['Name']} took {damage} damage: {hp_before} -> {hp_after}.", "success")
         except Exception as exc:
             self.handle_error(exc)
 
@@ -546,8 +546,8 @@ class RPGEditor:
             self.notify("Select an entity first.", "error")
             return
         try:
-            result = self.engine.aplicar_condicao(self.selected_entity, "PegandoFogo")
-            self.notify(f"Applied PegandoFogo: {result.get('CondicaoID', 'interaction')}.", "success")
+            result = self.engine.apply_condition(self.selected_entity, "OnFire")
+            self.notify(f"Applied OnFire: {result.get('ConditionID', 'interaction')}.", "success")
         except Exception as exc:
             self.handle_error(exc)
 
@@ -559,7 +559,7 @@ class RPGEditor:
         try:
             entity = self.engine._instances[self.selected_entity]
             for condition_id in list(entity.conditions):
-                self.engine.remover_condicao(self.selected_entity, condition_id)
+                self.engine.remove_condition(self.selected_entity, condition_id)
             self.notify("All conditions removed.", "success")
         except Exception as exc:
             self.handle_error(exc)
