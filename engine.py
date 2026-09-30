@@ -1322,6 +1322,7 @@ class Engine:
             "set_current_map": self.set_current_map,
             "create_entity": self.create_entity,
             "spawn_entity": self.spawn_entity,
+            "get_entity": self.get_entity,
             "list_entity_models": self.list_entity_models,
             "list_map_entities": self.list_map_entities,
             "remove_entity_from_map": self.remove_entity_from_map,
