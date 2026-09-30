@@ -35,7 +35,7 @@ goblin = engine.spawn_entity(goblin_model, 0, 0)
 
 print("Map:", engine.get_current_map())
 print("Goblin:", engine.get_basic_data(goblin))
-print("Test:", engine.make_attribute_check(goblin, "DEX"))
+print("Test:", engine.make_attribute_test(goblin, "DEX"))
 
 # The same model can create another independent instance.
 goblin_2 = engine.spawn_entity(goblin_model, 3, 3)

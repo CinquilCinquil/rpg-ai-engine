@@ -714,7 +714,7 @@ class Engine:
                     "Args": {"Attribute": "STR|DEX|INT|CHA|CON", "Modifier": "int"},
                     "Return": "int",
                 },
-                "MakeAttributeCheck": {
+                "MakeAttributeTest": {
                     "Args": {"Attribute": "STR|DEX|INT|CHA|CON", "Context": "string?"},
                     "Return": "object",
                 },
@@ -744,8 +744,8 @@ class Engine:
             return self.modify_status(instance_id, args.get("Status"), args.get("Modifier"))
         if action == "ModifyAttribute":
             return self.modify_attribute(instance_id, args.get("Attribute"), args.get("Modifier"))
-        if action == "MakeAttributeCheck":
-            return self.make_attribute_check(instance_id, args.get("Attribute"), args.get("Context"))
+        if action == "MakeAttributeTest":
+            return self.make_attribute_test(instance_id, args.get("Attribute"), args.get("Context"))
         if action == "UseItem":
             return self.use_item_or_ability(instance_id, args.get("Item"), args)
         if action == "ApplyCondition":
@@ -757,7 +757,7 @@ class Engine:
     # Tests
     # -----------------------------------------------------------------------
 
-    def make_attribute_check(self, instance_id: str, attribute: str, context: Optional[str] = None) -> dict:
+    def make_attribute_test(self, instance_id: str, attribute: str, context: Optional[str] = None) -> dict:
         instance = self._require_instance(instance_id)
         if instance.data["Type"] == "STATIC":
             raise EngineError("ACTION_UNAVAILABLE", "Static entities cannot make attribute tests.")
@@ -1305,7 +1305,7 @@ class Engine:
             "remove_entity_from_map": self.remove_entity_from_map,
             "list_entity_actions": self.list_entity_actions,
             "handle_entity_action": self.handle_entity_action,
-            "make_attribute_check": self.make_attribute_check,
+            "make_attribute_test": self.make_attribute_test,
             "get_basic_data": self.get_basic_data,
             "get_basic_field": self.get_basic_field,
             "set_position": self.set_position,
