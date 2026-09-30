@@ -60,3 +60,8 @@ final = chat(
 
 print(final.message.content)
 """
+
+# import json
+
+# with open("tools.json") as f:
+#    tools = json.load(f)

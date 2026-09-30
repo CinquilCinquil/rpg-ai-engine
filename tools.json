@@ -1,0 +1,914 @@
+[
+    {
+        "type": "function",
+        "function": {
+            "name": "roll_dice",
+            "description": "Roll an N-sided die, uniformly from 1 through N.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "n": {
+                        "type": "integer",
+                        "description": "N."
+                    }
+                },
+                "required": [
+                    "n"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "evaluate_expression",
+            "description": "Evaluate arithmetic and XdY dice expressions.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "expression": {
+                        "type": "string",
+                        "description": "Expression."
+                    }
+                },
+                "required": [
+                    "expression"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "calculate_distance",
+            "description": "Calculate the Manhattan distance between two positions.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "x": {
+                        "type": "integer",
+                        "description": "The X coordinate of the first position."
+                    },
+                    "y": {
+                        "type": "integer",
+                        "description": "The Y coordinate of the first position."
+                    },
+                    "w": {
+                        "type": "integer",
+                        "description": "The X coordinate of the second position."
+                    },
+                    "z": {
+                        "type": "integer",
+                        "description": "The Y coordinate of the second position."
+                    }
+                },
+                "required": [
+                    "x",
+                    "y",
+                    "w",
+                    "z"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_map",
+            "description": "Creates a map with the specified parameters and saves it in the map database.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "width": {
+                        "type": "integer",
+                        "description": "The width of the map."
+                    },
+                    "height": {
+                        "type": "integer",
+                        "description": "The height of the map."
+                    },
+                    "config": {
+                        "type": "array",
+                        "items": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "description": "The configuration of the map (what each cell contains)."
+                    }
+                },
+                "required": [
+                    "width",
+                    "height",
+                    "config"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "populate_map",
+            "description": "Populate the current map with the specified structure configuration.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "width": {
+                        "type": "integer",
+                        "description": "The width of the structure matrix."
+                    },
+                    "height": {
+                        "type": "integer",
+                        "description": "The height of the structure matrix."
+                    },
+                    "config": {
+                        "type": "array",
+                        "items": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "description": "The configuration of the map structures."
+                    }
+                },
+                "required": [
+                    "width",
+                    "height",
+                    "config"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_maps",
+            "description": "Return the IDs of all maps stored in the engine.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_current_map",
+            "description": "Return a snapshot of the currently selected map.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_current_map_id",
+            "description": "Return the ID of the currently selected map.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "set_current_map",
+            "description": "Select an existing map as the current map.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "map_id": {
+                        "type": "integer",
+                        "description": "The ID of the map to select."
+                    }
+                },
+                "required": [
+                    "map_id"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_entity",
+            "description": "Create an entity model and save it in the entity database.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "config": {
+                        "type": "object",
+                        "description": "The entity configuration."
+                    }
+                },
+                "required": [
+                    "config"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "spawn_entity",
+            "description": "Create a runtime entity instance on the current map.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "entity_id": {
+                        "type": "integer",
+                        "description": "The ID of the entity model to spawn."
+                    },
+                    "x": {
+                        "type": "integer",
+                        "description": "The X coordinate where the entity will be placed."
+                    },
+                    "y": {
+                        "type": "integer",
+                        "description": "The Y coordinate where the entity will be placed."
+                    }
+                },
+                "required": [
+                    "entity_id",
+                    "x",
+                    "y"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_entity",
+            "description": "Return a complete snapshot of an entity instance.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "instance_id": {
+                        "type": "string",
+                        "description": "The runtime entity instance ID."
+                    }
+                },
+                "required": [
+                    "instance_id"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_entity_models",
+            "description": "Return the IDs of all entity models in the database.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_map_entities",
+            "description": "Return the runtime entity instance IDs on the current map.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "remove_entity_from_map",
+            "description": "Remove an entity instance from the current map and clean up its inventory and active conditions.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "instance_id": {
+                        "type": "string",
+                        "description": "The runtime entity instance ID."
+                    }
+                },
+                "required": [
+                    "instance_id"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_entity_actions",
+            "description": "Return the actions available to an entity instance.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "instance_id": {
+                        "type": "string",
+                        "description": "The runtime entity instance ID."
+                    }
+                },
+                "required": [
+                    "instance_id"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "handle_entity_action",
+            "description": "Execute a named action for an entity instance.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "instance_id": {
+                        "type": "string",
+                        "description": "The runtime entity instance ID."
+                    },
+                    "action": {
+                        "type": "string",
+                        "description": "The name of the action to execute."
+                    },
+                    "args": {
+                        "type": "object",
+                        "description": "Arguments for the action."
+                    }
+                },
+                "required": [
+                    "instance_id",
+                    "action",
+                    "args"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "make_attribute_test",
+            "description": "Make an attribute test for an entity, including applicable proficiency modifiers.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "instance_id": {
+                        "type": "string",
+                        "description": "The runtime entity instance ID."
+                    },
+                    "attribute": {
+                        "type": "string",
+                        "description": "The attribute to test."
+                    },
+                    "context": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Optional context used to match proficiencies."
+                    }
+                },
+                "required": [
+                    "instance_id",
+                    "attribute"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_basic_data",
+            "description": "Return the standard basic data for an entity instance.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "instance_id": {
+                        "type": "string",
+                        "description": "The runtime entity instance ID."
+                    }
+                },
+                "required": [
+                    "instance_id"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_basic_field",
+            "description": "Return one named field from an entity instance.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "instance_id": {
+                        "type": "string",
+                        "description": "The runtime entity instance ID."
+                    },
+                    "field_name": {
+                        "type": "string",
+                        "description": "The name of the field to retrieve."
+                    }
+                },
+                "required": [
+                    "instance_id",
+                    "field_name"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "set_position",
+            "description": "Set the position of an entity on the current map.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "instance_id": {
+                        "type": "string",
+                        "description": "The runtime entity instance ID."
+                    },
+                    "x": {
+                        "type": "integer",
+                        "description": "The destination X coordinate."
+                    },
+                    "y": {
+                        "type": "integer",
+                        "description": "The destination Y coordinate."
+                    }
+                },
+                "required": [
+                    "instance_id",
+                    "x",
+                    "y"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "modify_status",
+            "description": "Modify a character status by the specified amount.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "instance_id": {
+                        "type": "string",
+                        "description": "The runtime entity instance ID."
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "The status to modify (HP, HPMax, AC, or XP)."
+                    },
+                    "modifier": {
+                        "type": "integer",
+                        "description": "The integer amount to add to the status."
+                    }
+                },
+                "required": [
+                    "instance_id",
+                    "status",
+                    "modifier"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "modify_attribute",
+            "description": "Modify a character attribute by the specified amount.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "instance_id": {
+                        "type": "string",
+                        "description": "The runtime entity instance ID."
+                    },
+                    "attribute": {
+                        "type": "string",
+                        "description": "The attribute to modify."
+                    },
+                    "modifier": {
+                        "type": "integer",
+                        "description": "The integer amount to add to the attribute."
+                    }
+                },
+                "required": [
+                    "instance_id",
+                    "attribute",
+                    "modifier"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_item_to_inventory",
+            "description": "Create an inventory item instance from an item model and add it to an entity's inventory.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "entity_instance_id": {
+                        "type": "string",
+                        "description": "The runtime entity instance ID."
+                    },
+                    "item_id": {
+                        "type": "integer",
+                        "description": "The item model ID."
+                    }
+                },
+                "required": [
+                    "entity_instance_id",
+                    "item_id"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "remove_item_from_inventory",
+            "description": "Remove an item instance from an entity's inventory.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "entity_instance_id": {
+                        "type": "string",
+                        "description": "The runtime entity instance ID."
+                    },
+                    "item_instance_id": {
+                        "type": "string",
+                        "description": "The runtime item instance ID."
+                    }
+                },
+                "required": [
+                    "entity_instance_id",
+                    "item_instance_id"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_inventory_items",
+            "description": "Return the item instance IDs in an entity's inventory.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "entity_instance_id": {
+                        "type": "string",
+                        "description": "The runtime entity instance ID."
+                    }
+                },
+                "required": [
+                    "entity_instance_id"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_abilities",
+            "description": "Return the ability model IDs assigned to an entity.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "entity_instance_id": {
+                        "type": "string",
+                        "description": "The runtime entity instance ID."
+                    }
+                },
+                "required": [
+                    "entity_instance_id"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_item_models",
+            "description": "Return the IDs of all item models in the database.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_ability_models",
+            "description": "Return the IDs of all ability models in the database.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_item_or_ability",
+            "description": "Return the model data for an item or ability.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "object_id": {
+                        "type": "integer",
+                        "description": "The item or ability model ID."
+                    }
+                },
+                "required": [
+                    "object_id"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_item_or_ability",
+            "description": "Create an item or ability model and save it in the database.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "config": {
+                        "type": "object",
+                        "description": "The item or ability configuration."
+                    }
+                },
+                "required": [
+                    "config"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "assign_ability",
+            "description": "Assign an ability model to an entity instance.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "entity_instance_id": {
+                        "type": "string",
+                        "description": "The runtime entity instance ID."
+                    },
+                    "ability_id": {
+                        "type": "integer",
+                        "description": "The ability model ID."
+                    }
+                },
+                "required": [
+                    "entity_instance_id",
+                    "ability_id"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "use_item",
+            "description": "Use an inventory item instance.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "entity_instance_id": {
+                        "type": "string",
+                        "description": "Entity instance id."
+                    },
+                    "item_instance_id": {
+                        "type": "string",
+                        "description": "Item instance id."
+                    },
+                    "args": {
+                        "type": "object",
+                        "nullable": true,
+                        "description": "Args."
+                    }
+                },
+                "required": [
+                    "entity_instance_id",
+                    "item_instance_id"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "use_ability",
+            "description": "Use an ability possessed by an entity.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "entity_instance_id": {
+                        "type": "string",
+                        "description": "The runtime entity instance ID."
+                    },
+                    "ability_id": {
+                        "type": "integer",
+                        "description": "The ability model ID."
+                    },
+                    "args": {
+                        "type": "object",
+                        "nullable": true,
+                        "description": "Optional arguments used by the ability's effect."
+                    }
+                },
+                "required": [
+                    "entity_instance_id",
+                    "ability_id"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "apply_condition",
+            "description": "Apply a condition to an entity instance.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "instance_id": {
+                        "type": "string",
+                        "description": "The runtime entity instance ID."
+                    },
+                    "condition": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "object"
+                            }
+                        ],
+                        "description": "A condition name or condition definition."
+                    },
+                    "config": {
+                        "type": "object",
+                        "nullable": true,
+                        "description": "Optional configuration used when condition is a name."
+                    }
+                },
+                "required": [
+                    "instance_id",
+                    "condition"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "remove_condition",
+            "description": "Remove an active condition from an entity instance.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "instance_id": {
+                        "type": "string",
+                        "description": "The runtime entity instance ID."
+                    },
+                    "condition_id": {
+                        "type": "string",
+                        "description": "The active condition ID."
+                    }
+                },
+                "required": [
+                    "instance_id",
+                    "condition_id"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_conditions",
+            "description": "Return all active conditions for an entity instance.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "instance_id": {
+                        "type": "string",
+                        "description": "The runtime entity instance ID."
+                    }
+                },
+                "required": [
+                    "instance_id"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "change_condition_duration",
+            "description": "Change the duration of an active condition.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "condition_id": {
+                        "type": "string",
+                        "description": "The active condition ID."
+                    },
+                    "duration": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The new duration, or None for an indefinite duration."
+                    }
+                },
+                "required": [
+                    "condition_id",
+                    "duration"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "attack",
+            "description": "Perform a combat attack from one entity against another.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "attacker_id": {
+                        "type": "string",
+                        "description": "The runtime instance ID of the attacker."
+                    },
+                    "target_id": {
+                        "type": "string",
+                        "description": "The runtime instance ID of the target."
+                    },
+                    "attack_modifier": {
+                        "type": "integer",
+                        "description": "The modifier added to the attack roll."
+                    },
+                    "damage_expression": {
+                        "type": "string",
+                        "description": "The expression used to calculate damage."
+                    }
+                },
+                "required": [
+                    "attacker_id",
+                    "target_id"
+                ],
+                "additionalProperties": false
+            }
+        }
+    }
+]
