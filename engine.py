@@ -407,6 +407,15 @@ class Engine:
     # -----------------------------------------------------------------------
 
     def calculate_distance(self, x: int, y: int, w: int, z: int) -> int:
+        """
+        Calculate the Manhattan distance between two positions.
+        
+        :param x: The X coordinate of the first position.
+        :param y: The Y coordinate of the first position.
+        :param w: The X coordinate of the second position.
+        :param z: The Y coordinate of the second position.
+        :return: The Manhattan distance between the two positions.
+        """
         for value, name in ((x, "X"), (y, "Y"), (w, "W"), (z, "Z")):
             self._require_int(value, name)
         return abs(x - w) + abs(y - z)
@@ -452,6 +461,14 @@ class Engine:
         return map_id
 
     def populate_map(self, width: int, height: int, config: list[list[str]]) -> dict:
+        """
+        Populate the current map with the specified structure configuration.
+        
+        :param width: The width of the structure matrix.
+        :param height: The height of the structure matrix.
+        :param config: The configuration of the map structures.
+        :return: A standardized success response.
+        """
         current = self._require_current_map()
         if width != current.width or height != current.height:
             raise EngineError(
@@ -464,9 +481,20 @@ class Engine:
         return success()
 
     def list_maps(self) -> list[int]:
+        """
+        Return the IDs of all maps stored in the engine.
+        
+        :return: A list of map IDs.
+        """
         return list(self.maps.keys())
 
     def get_current_map(self) -> dict:
+        """
+        Return a snapshot of the currently selected map.
+        
+        :return: A dictionary containing the map dimensions, terrain, structures,
+            and entity instances.
+        """
         current = self._require_current_map()
         return {
             "MapID": current.map_id,
@@ -486,9 +514,20 @@ class Engine:
         }
 
     def get_current_map_id(self) -> int:
+        """
+        Return the ID of the currently selected map.
+        
+        :return: The current map ID.
+        """
         return self._require_current_map().map_id
 
     def set_current_map(self, map_id: int) -> dict:
+        """
+        Select an existing map as the current map.
+        
+        :param map_id: The ID of the map to select.
+        :return: A standardized success response containing the selected map ID.
+        """
         self._require_map(map_id)
         self.current_map_id = map_id
         return success(map_id)
@@ -498,6 +537,12 @@ class Engine:
     # -----------------------------------------------------------------------
 
     def create_entity(self, config: dict) -> int:
+        """
+        Create an entity model and save it in the entity database.
+        
+        :param config: The entity configuration.
+        :return: The newly created entity model ID.
+        """
         if not isinstance(config, dict):
             raise EngineError("INVALID_ARGUMENT", "Entity CONFIG must be an object.")
 
@@ -535,6 +580,14 @@ class Engine:
     # -----------------------------------------------------------------------
 
     def spawn_entity(self, entity_id: int, x: int, y: int) -> str:
+        """
+        Create a runtime entity instance on the current map.
+        
+        :param entity_id: The ID of the entity model to spawn.
+        :param x: The X coordinate where the entity will be placed.
+        :param y: The Y coordinate where the entity will be placed.
+        :return: The newly created runtime instance ID.
+        """
         model = self._require_model(entity_id)
         current = self._require_current_map()
         self._require_position(x, y, current)
@@ -558,13 +611,30 @@ class Engine:
         return instance_id
 
     def list_entity_models(self) -> list[int]:
+        """
+        Return the IDs of all entity models in the database.
+        
+        :return: A list of entity model IDs.
+        """
         return list(self.entity_models.keys())
 
     def list_map_entities(self) -> list[str]:
+        """
+        Return the runtime entity instance IDs on the current map.
+        
+        :return: A list of entity instance IDs.
+        """
         current = self._require_current_map()
         return list(current.entity_instances.keys())
 
     def remove_entity_from_map(self, instance_id: str) -> dict:
+        """
+        Remove an entity instance from the current map and clean up
+        its inventory and active conditions.
+        
+        :param instance_id: The runtime entity instance ID.
+        :return: A standardized success response.
+        """
         instance = self._require_instance(instance_id)
         current = self._require_current_map()
         if instance_id not in current.entity_instances:
@@ -588,10 +658,24 @@ class Engine:
     # -----------------------------------------------------------------------
 
     def get_entity(self, instance_id: str) -> dict:
+        """
+        Return a complete snapshot of an entity instance.
+        
+        :param instance_id: The runtime entity instance ID.
+        :return: A dictionary containing the entity's data, position, inventory,
+            abilities, and active conditions.
+        """
         instance = self._require_instance(instance_id)
         return self._entity_snapshot(instance)
 
     def get_basic_data(self, instance_id: str) -> dict:
+        """
+        Return the standard basic data for an entity instance.
+        
+        :param instance_id: The runtime entity instance ID.
+        :return: A dictionary containing the entity's basic status, attributes,
+            proficiencies, and conditions.
+        """
         instance = self._require_instance(instance_id)
         data = instance.data
         if data["Type"] == "STATIC":
@@ -615,6 +699,13 @@ class Engine:
         }
 
     def get_basic_field(self, instance_id: str, field_name: str) -> Any:
+        """
+        Return one named field from an entity instance.
+        
+        :param instance_id: The runtime entity instance ID.
+        :param field_name: The name of the field to retrieve.
+        :return: The field value.
+        """
         instance = self._require_instance(instance_id)
         if field_name == "Conditions":
             return self.list_conditions(instance_id)
@@ -640,6 +731,14 @@ class Engine:
     # -----------------------------------------------------------------------
 
     def set_position(self, instance_id: str, x: int, y: int) -> dict:
+        """
+        Set the position of an entity on the current map.
+        
+        :param instance_id: The runtime entity instance ID.
+        :param x: The destination X coordinate.
+        :param y: The destination Y coordinate.
+        :return: A standardized success response.
+        """
         instance = self._require_instance(instance_id)
         current = self._require_current_map()
 
@@ -671,6 +770,14 @@ class Engine:
         return True
 
     def modify_status(self, instance_id: str, status: str, modifier: int) -> int:
+        """
+        Modify a character status by the specified amount.
+        
+        :param instance_id: The runtime entity instance ID.
+        :param status: The status to modify (HP, HPMax, AC, or XP).
+        :param modifier: The integer amount to add to the status.
+        :return: The resulting status value.
+        """
         instance = self._require_instance(instance_id)
         if instance.data["Type"] == "STATIC":
             raise EngineError("ACTION_UNAVAILABLE", "Static entities have no character status.")
@@ -698,6 +805,14 @@ class Engine:
         return int(instance.data[status])
 
     def modify_attribute(self, instance_id: str, attribute: str, modifier: int) -> int:
+        """
+        Modify a character attribute by the specified amount.
+        
+        :param instance_id: The runtime entity instance ID.
+        :param attribute: The attribute to modify.
+        :param modifier: The integer amount to add to the attribute.
+        :return: The resulting attribute value.
+        """
         instance = self._require_instance(instance_id)
         if instance.data["Type"] == "STATIC":
             raise EngineError("ACTION_UNAVAILABLE", "Static entities have no attributes.")
@@ -714,6 +829,12 @@ class Engine:
     # -----------------------------------------------------------------------
 
     def list_entity_actions(self, instance_id: str) -> dict:
+        """
+        Return the actions available to an entity instance.
+        
+        :param instance_id: The runtime entity instance ID.
+        :return: A dictionary describing each available action and its arguments.
+        """
         instance = self._require_instance(instance_id)
 
         actions = {
@@ -750,6 +871,14 @@ class Engine:
         return actions
 
     def handle_entity_action(self, instance_id: str, action: str, args: dict) -> Any:
+        """
+        Execute a named action for an entity instance.
+        
+        :param instance_id: The runtime entity instance ID.
+        :param action: The name of the action to execute.
+        :param args: Arguments for the action.
+        :return: The action result.
+        """
         self._require_instance(instance_id)
         if action not in self.list_entity_actions(instance_id):
             raise EngineError("ACTION_NOT_FOUND", f"Action {action} does not exist for this entity.")
@@ -777,6 +906,15 @@ class Engine:
     # -----------------------------------------------------------------------
 
     def make_attribute_test(self, instance_id: str, attribute: str, context: Optional[str] = None) -> dict:
+        """
+        Make an attribute test for an entity, including applicable
+        proficiency modifiers.
+        
+        :param instance_id: The runtime entity instance ID.
+        :param attribute: The attribute to test.
+        :param context: Optional context used to match proficiencies.
+        :return: A dictionary containing the roll, modifiers, and final result.
+        """
         instance = self._require_instance(instance_id)
         if instance.data["Type"] == "STATIC":
             raise EngineError("ACTION_UNAVAILABLE", "Static entities cannot make attribute tests.")
@@ -818,6 +956,14 @@ class Engine:
     # -----------------------------------------------------------------------
 
     def add_item_to_inventory(self, entity_instance_id: str, item_id: int) -> str:
+        """
+        Create an inventory item instance from an item model and add it
+        to an entity's inventory.
+        
+        :param entity_instance_id: The runtime entity instance ID.
+        :param item_id: The item model ID.
+        :return: The newly created item instance ID.
+        """
         entity = self._require_instance(entity_instance_id)
         if entity.data["Type"] == "STATIC":
             raise EngineError("ACTION_UNAVAILABLE", "Static entities cannot have inventories.")
@@ -836,6 +982,13 @@ class Engine:
         return instance_id
 
     def remove_item_from_inventory(self, entity_instance_id: str, item_instance_id: str) -> dict:
+        """
+        Remove an item instance from an entity's inventory.
+        
+        :param entity_instance_id: The runtime entity instance ID.
+        :param item_instance_id: The runtime item instance ID.
+        :return: A standardized success response.
+        """
         entity = self._require_instance(entity_instance_id)
         if item_instance_id not in entity.inventory:
             raise EngineError("ID_NOT_FOUND", f"Item instance {item_instance_id} is not in the inventory.")
@@ -845,10 +998,22 @@ class Engine:
         return success()
 
     def list_inventory_items(self, entity_instance_id: str) -> list[str]:
+        """
+        Return the item instance IDs in an entity's inventory.
+        
+        :param entity_instance_id: The runtime entity instance ID.
+        :return: A list of item instance IDs.
+        """
         entity = self._require_instance(entity_instance_id)
         return list(entity.inventory.keys())
 
     def list_abilities(self, entity_instance_id: str) -> list[int]:
+        """
+        Return the ability model IDs assigned to an entity.
+        
+        :param entity_instance_id: The runtime entity instance ID.
+        :return: A list of ability model IDs.
+        """
         entity = self._require_instance(entity_instance_id)
         return list(entity.abilities)
 
@@ -857,12 +1022,28 @@ class Engine:
     # -----------------------------------------------------------------------
 
     def list_item_models(self) -> list[int]:
+        """
+        Return the IDs of all item models in the database.
+        
+        :return: A list of item model IDs.
+        """
         return list(self.item_models.keys())
 
     def list_ability_models(self) -> list[int]:
+        """
+        Return the IDs of all ability models in the database.
+        
+        :return: A list of ability model IDs.
+        """
         return list(self.ability_models.keys())
 
     def get_item_or_ability(self, object_id: int) -> dict:
+        """
+        Return the model data for an item or ability.
+        
+        :param object_id: The item or ability model ID.
+        :return: A dictionary containing the model ID and model data.
+        """
         model = self._require_item_or_ability_model(object_id)
         return {
             "ModelID": getattr(model, "item_id", None) or model.ability_id,
@@ -870,6 +1051,12 @@ class Engine:
         }
 
     def create_item_or_ability(self, config: dict) -> int:
+        """
+        Create an item or ability model and save it in the database.
+        
+        :param config: The item or ability configuration.
+        :return: The newly created model ID.
+        """
         if not isinstance(config, dict):
             raise EngineError("INVALID_ARGUMENT", "CONFIG must be an object.")
 
@@ -901,6 +1088,13 @@ class Engine:
         return object_id
 
     def assign_ability(self, entity_instance_id: str, ability_id: int) -> dict:
+        """
+        Assign an ability model to an entity instance.
+        
+        :param entity_instance_id: The runtime entity instance ID.
+        :param ability_id: The ability model ID.
+        :return: A standardized success response.
+        """
         entity = self._require_instance(entity_instance_id)
         model = self._require_ability_model(ability_id)
 
@@ -941,6 +1135,14 @@ class Engine:
         ability_id: int,
         args: Optional[dict] = None,
     ) -> dict:
+        """
+        Use an ability possessed by an entity.
+        
+        :param entity_instance_id: The runtime entity instance ID.
+        :param ability_id: The ability model ID.
+        :param args: Optional arguments used by the ability's effect.
+        :return: The effect result.
+        """
         entity = self._require_instance(entity_instance_id)
         model = self._require_ability_model(ability_id)
         if model.data.get("Type") != "ABILITY":
@@ -1101,6 +1303,14 @@ class Engine:
         condition: str | dict,
         config: Optional[dict] = None,
     ) -> dict:
+        """
+        Apply a condition to an entity instance.
+        
+        :param instance_id: The runtime entity instance ID.
+        :param condition: A condition name or condition definition.
+        :param config: Optional configuration used when condition is a name.
+        :return: A dictionary describing the applied condition.
+        """
         entity = self._require_instance(instance_id)
 
         if isinstance(condition, dict):
@@ -1187,6 +1397,13 @@ class Engine:
         }
 
     def remove_condition(self, instance_id: str, condition_id: str) -> dict:
+        """
+        Remove an active condition from an entity instance.
+        
+        :param instance_id: The runtime entity instance ID.
+        :param condition_id: The active condition ID.
+        :return: A standardized success response.
+        """
         entity = self._require_instance(instance_id)
         if condition_id not in entity.conditions:
             raise EngineError("ID_NOT_FOUND", f"Condition {condition_id} is not active.")
@@ -1198,6 +1415,12 @@ class Engine:
         self._conditions.pop(condition_id, None)
 
     def list_conditions(self, instance_id: str) -> list[dict]:
+        """
+        Return all active conditions for an entity instance.
+        
+        :param instance_id: The runtime entity instance ID.
+        :return: A list of active condition dictionaries.
+        """
         entity = self._require_instance(instance_id)
         return [
             {
@@ -1212,6 +1435,13 @@ class Engine:
         ]
 
     def change_condition_duration(self, condition_id: str, duration: Optional[int]) -> dict:
+        """
+        Change the duration of an active condition.
+        
+        :param condition_id: The active condition ID.
+        :param duration: The new duration, or None for an indefinite duration.
+        :return: A standardized success response containing the new duration.
+        """
         if condition_id not in self._conditions:
             raise EngineError("ID_NOT_FOUND", f"Condition {condition_id} does not exist.")
 
@@ -1256,6 +1486,15 @@ class Engine:
         attack_modifier: int = 0,
         damage_expression: str = "1d4",
     ) -> dict:
+        """
+        Perform a combat attack from one entity against another.
+        
+        :param attacker_id: The runtime instance ID of the attacker.
+        :param target_id: The runtime instance ID of the target.
+        :param attack_modifier: The modifier added to the attack roll.
+        :param damage_expression: The expression used to calculate damage.
+        :return: A dictionary containing the attack roll, hit result, and damage data.
+        """
         attacker = self._require_instance(attacker_id)
         target = self._require_instance(target_id)
 
