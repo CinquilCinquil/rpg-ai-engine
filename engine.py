@@ -235,6 +235,12 @@ class ItemModel:
 
 
 @dataclass
+class AbilityModel:
+    ability_id : int
+    data : dict
+
+
+@dataclass
 class EntityInstance:
     instance_id: str
     model_id: int
@@ -291,6 +297,7 @@ class Engine:
         self.maps: dict[int, MapState] = {}
         self.entity_models: dict[int, EntityModel] = {}
         self.item_models: dict[int, ItemModel] = {}
+        self.ability_models: dict[int, AbilityModel] = {}
 
         self._next_map_id = 1
         self._next_entity_id = 1
@@ -357,6 +364,18 @@ class Engine:
         if item_id not in self.item_models:
             raise EngineError("ID_NOT_FOUND", f"Item model {item_id} does not exist.")
         return self.item_models[item_id]
+    
+    def _require_ability_model(self, ability_id: int) -> AbilityModel:
+        if ability_id not in self.ability_models:
+            raise EngineError("ID_NOT_FOUND", f"Ability model {ability_id} does not exist.")
+        return self.ability_models[ability_id]
+    
+    def _require_item_or_ability_model(self, item_or_ability_id: int) -> ItemModel:
+        if item_or_ability_id in self.item_models:
+            return self.item_models[item_or_ability_id]
+        if item_or_ability_id in self.ability_models:
+            return self.ability_models[item_or_ability_id]
+        raise EngineError("ID_NOT_FOUND", f"Item or Ability model {item_or_ability_id} does not exist.")
 
     def _require_position(self, x: int, y: int, map_state: Optional[MapState] = None):
         map_state = map_state or self._require_current_map()
@@ -841,16 +860,12 @@ class Engine:
         return list(self.item_models.keys())
 
     def list_ability_models(self) -> list[int]:
-        return [
-            item_id
-            for item_id, model in self.item_models.items()
-            if model.data.get("Type") == "ABILITY"
-        ]
+        return list(self.ability_models.keys())
 
     def get_item_or_ability(self, object_id: int) -> dict:
-        model = self._require_item_model(object_id)
+        model = self._require_item_or_ability_model(object_id)
         return {
-            "ModelID": model.item_id,
+            "ModelID": getattr(model, "item_id", None) or model.ability_id,
             **deep_copy(model.data),
         }
 
@@ -879,12 +894,15 @@ class Engine:
 
         object_id = self._next_item_id
         self._next_item_id += 1
-        self.item_models[object_id] = ItemModel(object_id, data)
+        if object_type == "ITEM":
+            self.item_models[object_id] = ItemModel(object_id, data)
+        else:
+            self.ability_models[object_id] = AbilityModel(object_id, data)
         return object_id
 
     def assign_ability(self, entity_instance_id: str, ability_id: int) -> dict:
         entity = self._require_instance(entity_instance_id)
-        model = self._require_item_model(ability_id)
+        model = self._require_ability_model(ability_id)
 
         if model.data.get("Type") != "ABILITY":
             raise EngineError("INVALID_VALUE", "The selected model is not a ABILITY.")
@@ -924,7 +942,7 @@ class Engine:
         args: Optional[dict] = None,
     ) -> dict:
         entity = self._require_instance(entity_instance_id)
-        model = self._require_item_model(ability_id)
+        model = self._require_ability_model(ability_id)
         if model.data.get("Type") != "ABILITY":
             raise EngineError("INVALID_VALUE", "The selected model is not a ABILITY.")
         if ability_id not in entity.abilities:
