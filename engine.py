@@ -766,7 +766,7 @@ class Engine:
         if action == "MakeAttributeTest":
             return self.make_attribute_test(instance_id, args.get("Attribute"), args.get("Context"))
         if action == "UseItem":
-            return self.use_item_or_ability(instance_id, args.get("Item"), args)
+            return self.use_item(instance_id, args.get("Item"), args)
         if action == "ApplyCondition":
             return self.apply_condition(instance_id, args.get("Condition"), args.get("Config"))
 
@@ -911,7 +911,7 @@ class Engine:
             entity.abilities.append(ability_id)
         return success()
 
-    def use_item_or_ability(
+    def use_item(
         self,
         entity_instance_id: str,
         item_instance_id: str,
@@ -1005,12 +1005,14 @@ class Engine:
         modifier = int(self.evaluate_expression(str(params.get("Modifier", 0))))
         if attribute not in ATTRIBUTES:
             raise EngineError("INVALID_VALUE", "Passive TargetAttribute must be an attribute.")
+        old = entity.data["Attributes"][attribute]
         new_value = self.modify_attribute(entity.instance_id, attribute, modifier)
         return {
             "Success": True,
             "Type": "PASSIVE",
             "Attribute": attribute,
             "Modifier": modifier,
+            "OldValue": old,
             "NewValue": new_value,
         }
 
@@ -1025,7 +1027,8 @@ class Engine:
             "Success": True,
             "Type": "SIMPLE_USE",
             "TargetAttribute": status,
-            "Roll": modifier,
+            "Modifier": modifier,
+            "PreviousValue": old,
             "PreviousHP": old if status == "HP" else None,
             "NewValue": new,
         }
@@ -1049,8 +1052,8 @@ class Engine:
             "Type": "TARGET_EFFECT",
             "Target": target.instance_id,
             "TargetAttribute": target_status,
-            "Roll": abs(modifier),
             "Modifier": modifier,
+            "PreviousValue": previous,
             "PreviousHP": previous if target_status == "HP" else None,
             "CurrentHP": new if target_status == "HP" else None,
             "NewValue": new,
@@ -1075,8 +1078,9 @@ class Engine:
                 new = self.modify_status(target.instance_id, target_status, modifier)
                 affected.append({
                     "InstanceID": target.instance_id,
-                    "Previous": previous,
-                    "Current": new,
+                    "TargetAttribute": target_status,
+                    "PreviousValue": previous,
+                    "CurrentValue": new,
                 })
 
         return {
@@ -1338,7 +1342,7 @@ class Engine:
             "get_item_or_ability": self.get_item_or_ability,
             "create_item_or_ability": self.create_item_or_ability,
             "assign_ability": self.assign_ability,
-            "use_item_or_ability": self.use_item_or_ability,
+            "use_item": self.use_item,
             "use_ability": self.use_ability,
             "apply_condition": self.apply_condition,
             "remove_condition": self.remove_condition,
